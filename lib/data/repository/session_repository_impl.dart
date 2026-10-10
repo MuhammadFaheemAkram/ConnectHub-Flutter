@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connect_hub/core/database/daos/cache_dao.dart';
 import 'package:connect_hub/core/storage/session_storage.dart';
 import 'package:connect_hub/data/mapper/auth_mappers.dart';
 import 'package:connect_hub/domain/model/session.dart';
@@ -9,9 +10,10 @@ import 'package:injectable/injectable.dart';
 
 @LazySingleton(as: SessionRepository)
 class SessionRepositoryImpl implements SessionRepository {
-  SessionRepositoryImpl(this._storage);
+  SessionRepositoryImpl(this._storage, this._cache);
 
   final SessionStorage _storage;
+  final CacheDao _cache;
 
   /// Every change, for every watcher. `sync: true` delivers each change to
   /// the watchers' queues the moment it happens, which keeps them in order.
@@ -59,7 +61,14 @@ class SessionRepositoryImpl implements SessionRepository {
   @override
   Future<void> expire() => _end(SignOutReason.expired);
 
+  /// Ending a session, for either reason, deletes everything that belonged
+  /// to it: the cached data, then the token.
+  ///
+  /// The order matters if the app dies in between. This way the worst case
+  /// is a session with an empty cache, which the next refresh fills; the
+  /// other way round, the next person to sign in could see this user's data.
   Future<void> _end(SignOutReason reason) async {
+    await _cache.clearAll();
     await _storage.delete();
     _publish(SessionState.signedOut(reason: reason));
   }

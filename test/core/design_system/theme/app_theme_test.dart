@@ -67,6 +67,13 @@ void main() {
       test('$name: the like heart stands out from the surface (3:1)', () {
         expect(contrast(colors.like, scheme.surface), greaterThanOrEqualTo(3));
       });
+
+      test('$name: avatar initials on the brand tint meet AA (4.5:1)', () {
+        expect(
+          contrast(scheme.onPrimaryContainer, scheme.primaryContainer),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
     }
   });
 }

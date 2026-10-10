@@ -1,14 +1,18 @@
 import 'dart:convert';
 
 import 'package:connect_hub/core/common/demo_account.dart';
+import 'package:connect_hub/core/database/app_database.dart';
 import 'package:connect_hub/core/network/fake_server/network_simulator.dart';
 import 'package:connect_hub/di/injection.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Builds the app's real composition root for app-level tests, with two
+import 'backend.dart';
+
+/// Builds the app's real composition root for app-level tests, with three
 /// swaps:
 /// - the secure store is the plugin's in-memory mock, pre-filled with
 ///   [secureStorage];
+/// - the database lives in memory (and is closed by `getIt.reset()`);
 /// - the simulated network has no latency, so the in-memory fake server
 ///   answers at once.
 ///
@@ -20,6 +24,11 @@ Future<void> configureTestDependencies({
   FlutterSecureStorage.setMockInitialValues(Map.of(secureStorage));
   await configureDependencies();
   getIt
+    ..unregister<AppDatabase>()
+    ..registerLazySingleton<AppDatabase>(
+      newTestDatabase,
+      dispose: (database) => database.close(),
+    )
     ..unregister<NetworkSimulator>()
     ..registerLazySingleton<NetworkSimulator>(
       () => NetworkSimulator(latencyFactor: 0),

@@ -10,10 +10,19 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
+import 'package:clock/clock.dart' as _i454;
 import 'package:connect_hub/core/common/id_generator.dart' as _i613;
+import 'package:connect_hub/core/database/app_database.dart' as _i131;
+import 'package:connect_hub/core/database/daos/cache_dao.dart' as _i423;
+import 'package:connect_hub/core/database/daos/feed_dao.dart' as _i324;
+import 'package:connect_hub/core/database/daos/posts_dao.dart' as _i355;
 import 'package:connect_hub/core/network/api/auth_api_service.dart' as _i1000;
+import 'package:connect_hub/core/network/api/fake_api_client.dart' as _i412;
 import 'package:connect_hub/core/network/api/fake_auth_api_service.dart'
     as _i270;
+import 'package:connect_hub/core/network/api/fake_feed_api_service.dart'
+    as _i609;
+import 'package:connect_hub/core/network/api/feed_api_service.dart' as _i632;
 import 'package:connect_hub/core/network/asset_json_loader.dart' as _i409;
 import 'package:connect_hub/core/network/fake_server/fake_server.dart' as _i698;
 import 'package:connect_hub/core/network/fake_server/network_simulator.dart'
@@ -22,19 +31,31 @@ import 'package:connect_hub/core/network/fake_server/seed_loader.dart' as _i483;
 import 'package:connect_hub/core/storage/session_storage.dart' as _i370;
 import 'package:connect_hub/data/repository/api_guard.dart' as _i525;
 import 'package:connect_hub/data/repository/auth_repository_impl.dart' as _i410;
+import 'package:connect_hub/data/repository/feed_repository_impl.dart' as _i233;
+import 'package:connect_hub/data/repository/post_repository_impl.dart' as _i945;
 import 'package:connect_hub/data/repository/session_repository_impl.dart'
     as _i1055;
 import 'package:connect_hub/di/app_module.dart' as _i781;
 import 'package:connect_hub/domain/repository/auth_repository.dart' as _i288;
+import 'package:connect_hub/domain/repository/feed_repository.dart' as _i676;
+import 'package:connect_hub/domain/repository/post_repository.dart' as _i721;
 import 'package:connect_hub/domain/repository/session_repository.dart' as _i596;
+import 'package:connect_hub/domain/usecase/bookmark_post_use_case.dart'
+    as _i459;
+import 'package:connect_hub/domain/usecase/like_post_use_case.dart' as _i1008;
+import 'package:connect_hub/domain/usecase/load_more_feed_use_case.dart'
+    as _i737;
 import 'package:connect_hub/domain/usecase/login_use_case.dart' as _i199;
 import 'package:connect_hub/domain/usecase/logout_use_case.dart' as _i696;
+import 'package:connect_hub/domain/usecase/refresh_feed_use_case.dart' as _i663;
 import 'package:connect_hub/domain/usecase/sign_up_use_case.dart' as _i958;
+import 'package:connect_hub/domain/usecase/watch_feed_use_case.dart' as _i735;
 import 'package:connect_hub/domain/usecase/watch_session_use_case.dart' as _i5;
 import 'package:connect_hub/features/auth/bloc/auth_bloc.dart' as _i854;
 import 'package:connect_hub/features/auth/login/bloc/login_bloc.dart' as _i837;
 import 'package:connect_hub/features/auth/sign_up/bloc/sign_up_bloc.dart'
     as _i611;
+import 'package:connect_hub/features/feed/cubit/feed_cubit.dart' as _i829;
 import 'package:flutter/services.dart' as _i281;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart' as _i558;
 import 'package:get_it/get_it.dart' as _i174;
@@ -52,6 +73,17 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i608.NetworkSimulator>(() => _i608.NetworkSimulator());
     gh.lazySingleton<_i281.AssetBundle>(() => appModule.assetBundle);
     gh.lazySingleton<_i558.FlutterSecureStorage>(() => appModule.secureStorage);
+    gh.lazySingleton<_i454.Clock>(() => appModule.clock);
+    gh.lazySingleton<_i131.AppDatabase>(() => appModule.appDatabase);
+    gh.lazySingleton<_i355.PostsDao>(
+      () => appModule.postsDao(gh<_i131.AppDatabase>()),
+    );
+    gh.lazySingleton<_i324.FeedDao>(
+      () => appModule.feedDao(gh<_i131.AppDatabase>()),
+    );
+    gh.lazySingleton<_i423.CacheDao>(
+      () => appModule.cacheDao(gh<_i131.AppDatabase>()),
+    );
     gh.lazySingleton<_i370.SessionStorage>(
       () => _i370.SessionStorage(gh<_i558.FlutterSecureStorage>()),
     );
@@ -61,8 +93,31 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i483.SeedLoader>(
       () => _i483.SeedLoader(gh<_i409.AssetJsonLoader>()),
     );
+    gh.lazySingleton<_i698.FakeServer>(
+      () => _i698.FakeServer(
+        gh<_i483.SeedLoader>(),
+        gh<_i613.IdGenerator>(),
+        gh<_i454.Clock>(),
+      ),
+    );
     gh.lazySingleton<_i596.SessionRepository>(
-      () => _i1055.SessionRepositoryImpl(gh<_i370.SessionStorage>()),
+      () => _i1055.SessionRepositoryImpl(
+        gh<_i370.SessionStorage>(),
+        gh<_i423.CacheDao>(),
+      ),
+    );
+    gh.lazySingleton<_i1000.AuthApiService>(
+      () => _i270.FakeAuthApiService(
+        gh<_i698.FakeServer>(),
+        gh<_i608.NetworkSimulator>(),
+      ),
+    );
+    gh.lazySingleton<_i412.FakeApiClient>(
+      () => _i412.FakeApiClient(
+        gh<_i370.SessionStorage>(),
+        gh<_i608.NetworkSimulator>(),
+        gh<_i698.FakeServer>(),
+      ),
     );
     gh.lazySingleton<_i525.ApiGuard>(
       () => _i525.ApiGuard(gh<_i596.SessionRepository>()),
@@ -70,13 +125,10 @@ extension GetItInjectableX on _i174.GetIt {
     gh.factory<_i5.WatchSessionUseCase>(
       () => _i5.WatchSessionUseCase(gh<_i596.SessionRepository>()),
     );
-    gh.lazySingleton<_i698.FakeServer>(
-      () => _i698.FakeServer(gh<_i483.SeedLoader>(), gh<_i613.IdGenerator>()),
-    );
-    gh.lazySingleton<_i1000.AuthApiService>(
-      () => _i270.FakeAuthApiService(
+    gh.lazySingleton<_i632.FeedApiService>(
+      () => _i609.FakeFeedApiService(
+        gh<_i412.FakeApiClient>(),
         gh<_i698.FakeServer>(),
-        gh<_i608.NetworkSimulator>(),
       ),
     );
     gh.lazySingleton<_i288.AuthRepository>(
@@ -85,6 +137,36 @@ extension GetItInjectableX on _i174.GetIt {
         gh<_i596.SessionRepository>(),
         gh<_i525.ApiGuard>(),
       ),
+    );
+    gh.lazySingleton<_i721.PostRepository>(
+      () => _i945.PostRepositoryImpl(
+        gh<_i632.FeedApiService>(),
+        gh<_i355.PostsDao>(),
+        gh<_i525.ApiGuard>(),
+        gh<_i454.Clock>(),
+      ),
+    );
+    gh.lazySingleton<_i676.FeedRepository>(
+      () => _i233.FeedRepositoryImpl(
+        gh<_i632.FeedApiService>(),
+        gh<_i324.FeedDao>(),
+        gh<_i525.ApiGuard>(),
+      ),
+    );
+    gh.factory<_i737.LoadMoreFeedUseCase>(
+      () => _i737.LoadMoreFeedUseCase(gh<_i676.FeedRepository>()),
+    );
+    gh.factory<_i663.RefreshFeedUseCase>(
+      () => _i663.RefreshFeedUseCase(gh<_i676.FeedRepository>()),
+    );
+    gh.factory<_i735.WatchFeedUseCase>(
+      () => _i735.WatchFeedUseCase(gh<_i676.FeedRepository>()),
+    );
+    gh.factory<_i459.BookmarkPostUseCase>(
+      () => _i459.BookmarkPostUseCase(gh<_i721.PostRepository>()),
+    );
+    gh.factory<_i1008.LikePostUseCase>(
+      () => _i1008.LikePostUseCase(gh<_i721.PostRepository>()),
     );
     gh.factory<_i199.LoginUseCase>(
       () => _i199.LoginUseCase(gh<_i288.AuthRepository>()),
@@ -97,6 +179,15 @@ extension GetItInjectableX on _i174.GetIt {
     );
     gh.factory<_i837.LoginBloc>(
       () => _i837.LoginBloc(gh<_i199.LoginUseCase>()),
+    );
+    gh.factory<_i829.FeedCubit>(
+      () => _i829.FeedCubit(
+        gh<_i735.WatchFeedUseCase>(),
+        gh<_i663.RefreshFeedUseCase>(),
+        gh<_i737.LoadMoreFeedUseCase>(),
+        gh<_i1008.LikePostUseCase>(),
+        gh<_i459.BookmarkPostUseCase>(),
+      ),
     );
     gh.factory<_i854.AuthBloc>(
       () => _i854.AuthBloc(

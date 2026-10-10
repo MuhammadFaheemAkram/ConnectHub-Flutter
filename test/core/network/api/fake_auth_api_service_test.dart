@@ -1,15 +1,10 @@
-import 'dart:math';
-
 import 'package:connect_hub/core/common/app_exception.dart';
 import 'package:connect_hub/core/common/demo_account.dart';
-import 'package:connect_hub/core/common/id_generator.dart';
 import 'package:connect_hub/core/network/api/fake_auth_api_service.dart';
-import 'package:connect_hub/core/network/asset_json_loader.dart';
-import 'package:connect_hub/core/network/fake_server/fake_server.dart';
 import 'package:connect_hub/core/network/fake_server/network_simulator.dart';
-import 'package:connect_hub/core/network/fake_server/seed_loader.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import '../../../helpers/backend.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -19,13 +14,7 @@ void main() {
 
   setUp(() {
     network = NetworkSimulator(latencyFactor: 0);
-    api = FakeAuthApiService(
-      FakeServer(
-        SeedLoader(AssetJsonLoader(rootBundle)),
-        IdGenerator(random: Random(1)),
-      ),
-      network,
-    );
+    api = FakeAuthApiService(newFakeServer(), network);
   });
 
   test('passes requests through to the server', () async {

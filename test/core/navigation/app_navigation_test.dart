@@ -1,11 +1,9 @@
-import 'package:connect_hub/app/connect_hub_app.dart';
 import 'package:connect_hub/di/injection.dart';
 import 'package:connect_hub/domain/repository/session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../helpers/pump_app.dart';
-import '../../helpers/test_dependencies.dart';
+import '../../helpers/app_harness.dart';
 
 // End-to-end tests of the sign-in gate and navigation, on the real stack: the
 // real DI graph, fake server, repositories and AuthBloc. Only the secure
@@ -13,40 +11,25 @@ import '../../helpers/test_dependencies.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Future<void> pumpConnectHub(
-    WidgetTester tester, {
-    bool signedIn = false,
-    String? initialLocation,
-  }) async {
-    await configureTestDependencies(
-      secureStorage: signedIn ? storedDemoSession() : const {},
-    );
-    tester.usePhoneSurface();
-    await tester.pumpWidget(ConnectHubApp(initialLocation: initialLocation));
-    await tester.pumpAndSettle();
-  }
-
   Finder destination(String label) => find.descendant(
     of: find.byType(NavigationBar),
     matching: find.text(label),
   );
-
-  Future<void> tapAndSettle(WidgetTester tester, Finder finder) async {
-    await tester.tap(finder);
-    await tester.pumpAndSettle();
-  }
 
   Finder appBarTitled(String title) => find.widgetWithText(AppBar, title);
 
   final onLogin = find.text('Welcome to ConnectHub');
   final onFeed = appBarTitled('ConnectHub');
 
+  // p1, the newest post in the seed, by Ada Lovelace.
+  final firstPost = find.textContaining('analytical engine scheduler');
+
   int selectedTab(WidgetTester tester) =>
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
 
   Future<void> signInWithDemoAccount(WidgetTester tester) async {
-    await tapAndSettle(tester, find.text('Use demo account'));
-    await tapAndSettle(tester, find.text('Sign in'));
+    await tester.tapAndSettle(find.text('Use demo account'));
+    await tester.tapAndSettle(find.text('Sign in'));
   }
 
   group('Session', () {
@@ -91,7 +74,7 @@ void main() {
         find.widgetWithText(TextField, 'Password'),
         'not-the-password',
       );
-      await tapAndSettle(tester, find.text('Sign in'));
+      await tester.tapAndSettle(find.text('Sign in'));
 
       expect(find.text('Incorrect email or password.'), findsOneWidget);
       expect(onLogin, findsOneWidget);
@@ -99,20 +82,19 @@ void main() {
 
     testWidgets('creating an account signs it in', (tester) async {
       await pumpConnectHub(tester);
-      await tapAndSettle(tester, find.text('Create an account'));
+      await tester.tapAndSettle(find.text('Create an account'));
 
       Finder field(String label) => find.widgetWithText(TextField, label);
       await tester.enterText(field('Name'), 'Ada Lovelace');
       await tester.enterText(field('Email'), 'ada@example.com');
       await tester.enterText(field('Password'), 'engines');
       await tester.enterText(field('Confirm password'), 'engines');
-      await tapAndSettle(
-        tester,
+      await tester.tapAndSettle(
         find.widgetWithText(FilledButton, 'Create account'),
       );
 
       expect(onFeed, findsOneWidget);
-      await tapAndSettle(tester, destination('Profile'));
+      await tester.tapAndSettle(destination('Profile'));
       expect(
         find.textContaining('Signed in as ada@example.com'),
         findsOneWidget,
@@ -123,15 +105,15 @@ void main() {
       tester,
     ) async {
       await pumpConnectHub(tester, signedIn: true);
-      await tapAndSettle(tester, destination('Profile'));
+      await tester.tapAndSettle(destination('Profile'));
 
-      await tapAndSettle(tester, find.text('Log out'));
+      await tester.tapAndSettle(find.text('Log out'));
       expect(find.text('Log out?'), findsOneWidget);
-      await tapAndSettle(tester, find.text('Cancel'));
+      await tester.tapAndSettle(find.text('Cancel'));
       expect(appBarTitled('Profile'), findsOneWidget);
 
-      await tapAndSettle(tester, find.text('Log out'));
-      await tapAndSettle(tester, find.widgetWithText(FilledButton, 'Log out'));
+      await tester.tapAndSettle(find.text('Log out'));
+      await tester.tapAndSettle(find.widgetWithText(FilledButton, 'Log out'));
 
       expect(onLogin, findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
@@ -146,14 +128,14 @@ void main() {
       expect(find.text('Post "p3"'), findsOneWidget);
 
       // Opened directly, the post has nothing underneath to go back to.
-      await tapAndSettle(tester, find.byTooltip('Go to the feed'));
+      await tester.tapAndSettle(find.byTooltip('Go to the feed'));
       expect(onFeed, findsOneWidget);
     });
 
     testWidgets('an expired session returns to Login with an explanation, and '
         'signing in again returns to where the user was', (tester) async {
       await pumpConnectHub(tester, signedIn: true);
-      await tapAndSettle(tester, find.text('Open a sample post'));
+      await tester.tapAndSettle(firstPost);
       expect(find.text('Post "p1"'), findsOneWidget);
 
       // What ApiGuard does when the server answers 401.
@@ -173,10 +155,10 @@ void main() {
     ) async {
       await pumpConnectHub(tester);
 
-      await tapAndSettle(tester, find.text('Create an account'));
+      await tester.tapAndSettle(find.text('Create an account'));
       expect(appBarTitled('Create account'), findsOneWidget);
 
-      await tapAndSettle(tester, find.byType(BackButton));
+      await tester.tapAndSettle(find.byType(BackButton));
       expect(onLogin, findsOneWidget);
     });
   });
@@ -192,15 +174,15 @@ void main() {
         hasLength(5),
       );
 
-      await tapAndSettle(tester, destination('Search'));
+      await tester.tapAndSettle(destination('Search'));
       expect(appBarTitled('Search'), findsOneWidget);
-      await tapAndSettle(tester, destination('Bookmarks'));
+      await tester.tapAndSettle(destination('Bookmarks'));
       expect(appBarTitled('Bookmarks'), findsOneWidget);
-      await tapAndSettle(tester, destination('Activity'));
+      await tester.tapAndSettle(destination('Activity'));
       expect(appBarTitled('Activity'), findsOneWidget);
-      await tapAndSettle(tester, destination('Profile'));
+      await tester.tapAndSettle(destination('Profile'));
       expect(appBarTitled('Profile'), findsOneWidget);
-      await tapAndSettle(tester, destination('Feed'));
+      await tester.tapAndSettle(destination('Feed'));
       expect(onFeed, findsOneWidget);
     });
   });
@@ -210,23 +192,23 @@ void main() {
         'returns to the Feed', (tester) async {
       await pumpConnectHub(tester, signedIn: true);
 
-      await tapAndSettle(tester, find.text('Open a sample post'));
+      await tester.tapAndSettle(firstPost);
       expect(find.text('Post "p1"'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
 
-      await tapAndSettle(tester, find.byType(BackButton));
+      await tester.tapAndSettle(find.byType(BackButton));
       expect(onFeed, findsOneWidget);
       expect(selectedTab(tester), 0);
     });
 
     testWidgets('comments open on top of their post', (tester) async {
       await pumpConnectHub(tester, signedIn: true);
-      await tapAndSettle(tester, find.text('Open a sample post'));
+      await tester.tapAndSettle(firstPost);
 
-      await tapAndSettle(tester, find.text('View comments'));
+      await tester.tapAndSettle(find.text('View comments'));
       expect(appBarTitled('Comments'), findsOneWidget);
 
-      await tapAndSettle(tester, find.byType(BackButton));
+      await tester.tapAndSettle(find.byType(BackButton));
       expect(find.text('Post "p1"'), findsOneWidget);
     });
 
@@ -235,13 +217,13 @@ void main() {
     ) async {
       await pumpConnectHub(tester, signedIn: true);
 
-      await tapAndSettle(tester, find.byTooltip('Chats'));
+      await tester.tapAndSettle(find.byTooltip('Chats'));
       expect(appBarTitled('Chats'), findsOneWidget);
-      await tapAndSettle(tester, find.text('Open a sample chat'));
+      await tester.tapAndSettle(find.text('Open a sample chat'));
       expect(appBarTitled('Chat'), findsOneWidget);
 
-      await tapAndSettle(tester, find.byType(BackButton));
-      await tapAndSettle(tester, find.byType(BackButton));
+      await tester.tapAndSettle(find.byType(BackButton));
+      await tester.tapAndSettle(find.byType(BackButton));
       expect(onFeed, findsOneWidget);
     });
 
@@ -250,11 +232,11 @@ void main() {
     ) async {
       await pumpConnectHub(tester, signedIn: true);
 
-      await tapAndSettle(tester, find.byTooltip('New post'));
+      await tester.tapAndSettle(find.byTooltip('New post'));
       expect(appBarTitled('New post'), findsOneWidget);
       expect(find.byType(CloseButton), findsOneWidget);
 
-      await tapAndSettle(tester, find.byType(CloseButton));
+      await tester.tapAndSettle(find.byType(CloseButton));
       expect(onFeed, findsOneWidget);
     });
 
@@ -264,23 +246,23 @@ void main() {
       await pumpConnectHub(tester, signedIn: true, initialLocation: '/compose');
       expect(appBarTitled('New post'), findsOneWidget);
 
-      await tapAndSettle(tester, find.byTooltip('Go to the feed'));
+      await tester.tapAndSettle(find.byTooltip('Go to the feed'));
       expect(onFeed, findsOneWidget);
     });
 
     testWidgets('Settings and Edit profile open from the Profile tab, and '
         'closing them returns to that tab', (tester) async {
       await pumpConnectHub(tester, signedIn: true);
-      await tapAndSettle(tester, destination('Profile'));
+      await tester.tapAndSettle(destination('Profile'));
 
-      await tapAndSettle(tester, find.byTooltip('Settings'));
+      await tester.tapAndSettle(find.byTooltip('Settings'));
       expect(appBarTitled('Settings'), findsOneWidget);
-      await tapAndSettle(tester, find.byType(BackButton));
+      await tester.tapAndSettle(find.byType(BackButton));
       expect(selectedTab(tester), 4);
 
-      await tapAndSettle(tester, find.text('Edit profile'));
+      await tester.tapAndSettle(find.text('Edit profile'));
       expect(find.byType(CloseButton), findsOneWidget);
-      await tapAndSettle(tester, find.byType(CloseButton));
+      await tester.tapAndSettle(find.byType(CloseButton));
       expect(appBarTitled('Profile'), findsOneWidget);
       expect(selectedTab(tester), 4);
     });
@@ -288,7 +270,7 @@ void main() {
     testWidgets("someone else's profile opens above the shell", (tester) async {
       await pumpConnectHub(tester, signedIn: true);
 
-      await tapAndSettle(tester, find.text('Open a sample profile'));
+      await tester.tapAndSettle(find.text('Ada Lovelace').first);
 
       expect(find.text('Profile "u_ada" arrives in Phase 5.'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);

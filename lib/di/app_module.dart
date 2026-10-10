@@ -1,3 +1,8 @@
+import 'package:clock/clock.dart';
+import 'package:connect_hub/core/database/app_database.dart';
+import 'package:connect_hub/core/database/daos/cache_dao.dart';
+import 'package:connect_hub/core/database/daos/feed_dao.dart';
+import 'package:connect_hub/core/database/daos/posts_dao.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
@@ -13,4 +18,22 @@ abstract class AppModule {
   /// Keychain on iOS, Keystore-backed storage on Android.
   @lazySingleton
   FlutterSecureStorage get secureStorage => const FlutterSecureStorage();
+
+  /// The current time, injected so tests can fix it (`Clock.fixed`).
+  @lazySingleton
+  Clock get clock => const Clock();
+
+  /// One database for the whole app. Several connections to the same SQLite
+  /// file would break drift's change notifications.
+  @lazySingleton
+  AppDatabase get appDatabase => AppDatabase();
+
+  @lazySingleton
+  PostsDao postsDao(AppDatabase database) => database.postsDao;
+
+  @lazySingleton
+  FeedDao feedDao(AppDatabase database) => database.feedDao;
+
+  @lazySingleton
+  CacheDao cacheDao(AppDatabase database) => database.cacheDao;
 }

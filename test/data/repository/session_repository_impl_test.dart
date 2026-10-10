@@ -2,20 +2,28 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:async/async.dart' show StreamQueue;
+import 'package:connect_hub/core/database/app_database.dart';
 import 'package:connect_hub/core/storage/session_storage.dart';
 import 'package:connect_hub/data/repository/session_repository_impl.dart';
 import 'package:connect_hub/domain/model/session_state.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/backend.dart';
+import '../../helpers/database_rows.dart';
 import '../../helpers/fixtures.dart';
 import '../../helpers/stream_helpers.dart';
 
 void main() {
+  late AppDatabase database;
   late SessionRepositoryImpl repository;
 
-  SessionRepositoryImpl newRepository() =>
-      SessionRepositoryImpl(const SessionStorage(FlutterSecureStorage()));
+  setUp(() => database = newTestDatabase());
+
+  SessionRepositoryImpl newRepository() => SessionRepositoryImpl(
+    const SessionStorage(FlutterSecureStorage()),
+    database.cacheDao,
+  );
 
   Map<String, String> stored() => {
     'session': jsonEncode({
@@ -25,7 +33,10 @@ void main() {
     }),
   };
 
-  tearDown(() => repository.dispose());
+  tearDown(() async {
+    await repository.dispose();
+    await database.close();
+  });
 
   test('restores "signed out" when nothing is stored', () async {
     FlutterSecureStorage.setMockInitialValues({});
@@ -96,6 +107,24 @@ void main() {
     },
   );
 
+  test('logging out and expiring both wipe the cache: it belonged to the '
+      'user who left', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    repository = newRepository();
+    Future<bool> cacheIsEmpty() async =>
+        (await database.select(database.posts).get()).isEmpty;
+
+    await repository.save(demoSession);
+    await database.feedDao.replaceFeed([cachedPost('p1')]);
+    await repository.clear();
+    expect(await cacheIsEmpty(), isTrue);
+
+    await repository.save(demoSession);
+    await database.feedDao.replaceFeed([cachedPost('p1')]);
+    await repository.expire();
+    expect(await cacheIsEmpty(), isTrue);
+  });
+
   test('a later watcher gets the current state straight away', () async {
     FlutterSecureStorage.setMockInitialValues({});
     repository = newRepository();
@@ -111,7 +140,7 @@ void main() {
   test('a sign-in that finishes while storage is still being read wins over '
       'the (older) stored value', () async {
     final storage = _GatedStorage();
-    repository = SessionRepositoryImpl(storage);
+    repository = SessionRepositoryImpl(storage, database.cacheDao);
     final states = <SessionState>[];
     final subscription = repository.watchSession().listen(states.add);
     await pumpEventQueue(); // the restore is now waiting on storage
