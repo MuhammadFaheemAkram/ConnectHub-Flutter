@@ -1,38 +1,36 @@
-import 'package:connect_hub/core/design_system/design_system.dart';
+import 'package:connect_hub/core/common/app_exception.dart';
 import 'package:connect_hub/core/navigation/app_routes.dart';
-import 'package:connect_hub/core/navigation/placeholder_session.dart';
 import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/domain/model/session_state.dart';
+import 'package:connect_hub/features/auth/bloc/auth_bloc.dart';
+import 'package:connect_hub/features/auth/bloc/auth_state.dart';
+import 'package:connect_hub/features/auth/login/bloc/login_bloc.dart';
+import 'package:connect_hub/features/auth/login/login_view.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Placeholder for the Login screen (the real form arrives in Phase 2).
-///
-/// "Continue" flips the temporary [PlaceholderSession]. The page itself never
-/// navigates to the Feed: the router's sign-in gate does that as soon as the
-/// session changes.
+/// Wires the Login screen: provides its [LoginBloc] and hands the view plain
+/// values and callbacks. The view therefore needs no router, no `getIt` and
+/// no `AuthBloc` in its widget tests.
 class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
+  const LoginPage({super.key, this.from});
+
+  /// The return address, passed on to Sign Up so it survives that detour.
+  final String? from;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
-      body: EmptyStateView(
-        icon: Icons.lock_outline,
-        title: 'Welcome to ConnectHub',
-        message: 'The sign-in form arrives in Phase 2.',
-        action: Column(
-          children: [
-            FilledButton(
-              onPressed: getIt<PlaceholderSession>().signIn,
-              child: const Text('Continue'),
-            ),
-            const SizedBox(height: AppSpacing.xSmall),
-            TextButton(
-              onPressed: () => const SignUpRoute().push<void>(context),
-              child: const Text('Create an account'),
-            ),
-          ],
-        ),
+    final sessionExpired = context.select(
+      (AuthBloc bloc) => switch (bloc.state) {
+        AuthUnauthenticated(reason: SignOutReason.expired) => true,
+        _ => false,
+      },
+    );
+    return BlocProvider(
+      create: (_) => getIt<LoginBloc>(),
+      child: LoginView(
+        notice: sessionExpired ? const UnauthorizedException().message : null,
+        onCreateAccount: () => SignUpRoute(from: from).push<void>(context),
       ),
     );
   }

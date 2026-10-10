@@ -27,10 +27,16 @@ RouteBase get $splashRoute => GoRouteData.$route(
 );
 
 mixin $SplashRoute on GoRouteData {
-  static SplashRoute _fromState(GoRouterState state) => const SplashRoute();
+  static SplashRoute _fromState(GoRouterState state) =>
+      SplashRoute(from: state.uri.queryParameters['from']);
+
+  SplashRoute get _self => this as SplashRoute;
 
   @override
-  String get location => GoRouteData.$location('/splash');
+  String get location => GoRouteData.$location(
+    '/splash',
+    queryParams: {if (_self.from != null) 'from': _self.from},
+  );
 
   @override
   void go(BuildContext context) => context.go(location);
@@ -60,10 +66,16 @@ RouteBase get $loginRoute => GoRouteData.$route(
 );
 
 mixin $LoginRoute on GoRouteData {
-  static LoginRoute _fromState(GoRouterState state) => const LoginRoute();
+  static LoginRoute _fromState(GoRouterState state) =>
+      LoginRoute(from: state.uri.queryParameters['from']);
+
+  LoginRoute get _self => this as LoginRoute;
 
   @override
-  String get location => GoRouteData.$location('/login');
+  String get location => GoRouteData.$location(
+    '/login',
+    queryParams: {if (_self.from != null) 'from': _self.from},
+  );
 
   @override
   void go(BuildContext context) => context.go(location);
@@ -80,10 +92,16 @@ mixin $LoginRoute on GoRouteData {
 }
 
 mixin $SignUpRoute on GoRouteData {
-  static SignUpRoute _fromState(GoRouterState state) => const SignUpRoute();
+  static SignUpRoute _fromState(GoRouterState state) =>
+      SignUpRoute(from: state.uri.queryParameters['from']);
+
+  SignUpRoute get _self => this as SignUpRoute;
 
   @override
-  String get location => GoRouteData.$location('/login/signup');
+  String get location => GoRouteData.$location(
+    '/login/signup',
+    queryParams: {if (_self.from != null) 'from': _self.from},
+  );
 
   @override
   void go(BuildContext context) => context.go(location);

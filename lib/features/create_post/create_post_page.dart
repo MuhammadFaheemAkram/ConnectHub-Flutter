@@ -1,4 +1,5 @@
 import 'package:connect_hub/core/design_system/design_system.dart';
+import 'package:connect_hub/core/navigation/back_to_feed_button.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Placeholder for Create Post (the real composer arrives in Phase 4).
@@ -11,7 +12,10 @@ class CreatePostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('New post')),
+      appBar: AppBar(
+        leading: const BackToFeedButton.close(),
+        title: const Text('New post'),
+      ),
       body: const EmptyStateView(
         icon: Icons.edit_note,
         title: 'New post',

@@ -25,6 +25,21 @@ void main() {
     expect(const SettingsRoute().location, '/settings');
   });
 
+  test('the return address travels as an encoded query parameter', () {
+    expect(
+      const LoginRoute(from: '/posts/p3').location,
+      '/login?from=%2Fposts%2Fp3',
+    );
+    expect(
+      const SignUpRoute(from: '/posts/p3').location,
+      '/login/signup?from=%2Fposts%2Fp3',
+    );
+    expect(
+      const SplashRoute(from: '/chats/c1').location,
+      '/splash?from=%2Fchats%2Fc1',
+    );
+  });
+
   test('path parameters are URL-encoded', () {
     expect(const UserProfileRoute(userId: 'a b').location, '/users/a%20b');
   });

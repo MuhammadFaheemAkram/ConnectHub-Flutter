@@ -1,4 +1,5 @@
 import 'package:connect_hub/core/design_system/design_system.dart';
+import 'package:connect_hub/core/navigation/back_to_feed_button.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Placeholder for a chat (the real screen arrives in Phase 6).
@@ -10,7 +11,10 @@ class ChatDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Chat')),
+      appBar: AppBar(
+        leading: const BackToFeedButton(),
+        title: const Text('Chat'),
+      ),
       body: EmptyStateView(
         icon: Icons.chat_outlined,
         title: 'Chat',

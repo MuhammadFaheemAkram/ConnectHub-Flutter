@@ -1,15 +1,16 @@
 import 'package:connect_hub/app/connect_hub_app.dart';
-import 'package:connect_hub/core/navigation/placeholder_session.dart';
 import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/domain/repository/session_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../helpers/pump_app.dart';
 import '../../helpers/test_dependencies.dart';
 
+// End-to-end tests of the sign-in gate and navigation, on the real stack: the
+// real DI graph, fake server, repositories and AuthBloc. Only the secure
+// store (an in-memory mock) and the network latency (zero) are swapped.
 void main() {
-  late PlaceholderSession session;
-
   tearDown(getIt.reset);
 
   Future<void> pumpConnectHub(
@@ -17,13 +18,14 @@ void main() {
     bool signedIn = false,
     String? initialLocation,
   }) async {
-    session = registerTestDependencies(signedIn: signedIn);
+    await configureTestDependencies(
+      secureStorage: signedIn ? storedDemoSession() : const {},
+    );
     tester.usePhoneSurface();
     await tester.pumpWidget(ConnectHubApp(initialLocation: initialLocation));
     await tester.pumpAndSettle();
   }
 
-  // Scoped to the NavigationBar: "Search" is also the Search screen's title.
   Finder destination(String label) => find.descendant(
     of: find.byType(NavigationBar),
     matching: find.text(label),
@@ -36,54 +38,134 @@ void main() {
 
   Finder appBarTitled(String title) => find.widgetWithText(AppBar, title);
 
+  final onLogin = find.text('Welcome to ConnectHub');
+  final onFeed = appBarTitled('ConnectHub');
+
   int selectedTab(WidgetTester tester) =>
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
 
-  group('Sign-in gate', () {
-    testWidgets('a signed-out launch lands on Login, without the tab bar', (
+  Future<void> signInWithDemoAccount(WidgetTester tester) async {
+    await tapAndSettle(tester, find.text('Use demo account'));
+    await tapAndSettle(tester, find.text('Sign in'));
+  }
+
+  group('Session', () {
+    testWidgets('a launch without a saved session lands on Login', (
       tester,
     ) async {
       await pumpConnectHub(tester);
 
-      expect(find.text('Welcome to ConnectHub'), findsOneWidget);
+      expect(onLogin, findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
     });
 
-    testWidgets('signing in moves to the Feed with no navigation code', (
+    testWidgets('a saved session is restored straight into the Feed', (
+      tester,
+    ) async {
+      await pumpConnectHub(tester, signedIn: true);
+
+      expect(onFeed, findsOneWidget);
+      expect(selectedTab(tester), 0);
+    });
+
+    testWidgets('signing in with the demo account opens the Feed', (
       tester,
     ) async {
       await pumpConnectHub(tester);
 
-      await tapAndSettle(tester, find.text('Continue'));
+      await signInWithDemoAccount(tester);
 
-      expect(session.isSignedIn, isTrue);
-      expect(appBarTitled('ConnectHub'), findsOneWidget);
-      expect(selectedTab(tester), 0);
+      expect(onFeed, findsOneWidget);
     });
 
-    testWidgets('logging out from the Profile tab returns to Login', (
+    testWidgets('a wrong password keeps the user on Login, with the reason', (
+      tester,
+    ) async {
+      await pumpConnectHub(tester);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Email'),
+        'demo@connecthub.app',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Password'),
+        'not-the-password',
+      );
+      await tapAndSettle(tester, find.text('Sign in'));
+
+      expect(find.text('Incorrect email or password.'), findsOneWidget);
+      expect(onLogin, findsOneWidget);
+    });
+
+    testWidgets('creating an account signs it in', (tester) async {
+      await pumpConnectHub(tester);
+      await tapAndSettle(tester, find.text('Create an account'));
+
+      Finder field(String label) => find.widgetWithText(TextField, label);
+      await tester.enterText(field('Name'), 'Ada Lovelace');
+      await tester.enterText(field('Email'), 'ada@example.com');
+      await tester.enterText(field('Password'), 'engines');
+      await tester.enterText(field('Confirm password'), 'engines');
+      await tapAndSettle(
+        tester,
+        find.widgetWithText(FilledButton, 'Create account'),
+      );
+
+      expect(onFeed, findsOneWidget);
+      await tapAndSettle(tester, destination('Profile'));
+      expect(
+        find.textContaining('Signed in as ada@example.com'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('logging out asks first, then returns to Login', (
       tester,
     ) async {
       await pumpConnectHub(tester, signedIn: true);
       await tapAndSettle(tester, destination('Profile'));
 
       await tapAndSettle(tester, find.text('Log out'));
+      expect(find.text('Log out?'), findsOneWidget);
+      await tapAndSettle(tester, find.text('Cancel'));
+      expect(appBarTitled('Profile'), findsOneWidget);
 
-      expect(find.text('Welcome to ConnectHub'), findsOneWidget);
+      await tapAndSettle(tester, find.text('Log out'));
+      await tapAndSettle(tester, find.widgetWithText(FilledButton, 'Log out'));
+
+      expect(onLogin, findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
     });
 
-    testWidgets('a deep link while signed out lands on Login', (tester) async {
-      await pumpConnectHub(tester, initialLocation: '/posts/p1');
+    testWidgets('a deep link while signed out opens after signing in, and its '
+        'back button then leads to the Feed', (tester) async {
+      await pumpConnectHub(tester, initialLocation: '/posts/p3');
+      expect(onLogin, findsOneWidget);
 
-      expect(find.text('Welcome to ConnectHub'), findsOneWidget);
-      expect(find.text('Post "p1"'), findsNothing);
+      await signInWithDemoAccount(tester);
+      expect(find.text('Post "p3"'), findsOneWidget);
+
+      // Opened directly, the post has nothing underneath to go back to.
+      await tapAndSettle(tester, find.byTooltip('Go to the feed'));
+      expect(onFeed, findsOneWidget);
     });
 
-    testWidgets('while signed in, Login is unreachable', (tester) async {
-      await pumpConnectHub(tester, signedIn: true, initialLocation: '/login');
+    testWidgets('an expired session returns to Login with an explanation, and '
+        'signing in again returns to where the user was', (tester) async {
+      await pumpConnectHub(tester, signedIn: true);
+      await tapAndSettle(tester, find.text('Open a sample post'));
+      expect(find.text('Post "p1"'), findsOneWidget);
 
-      expect(appBarTitled('ConnectHub'), findsOneWidget);
+      // What ApiGuard does when the server answers 401.
+      await getIt<SessionRepository>().expire();
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Your session has expired. Please sign in again.'),
+        findsOneWidget,
+      );
+      await signInWithDemoAccount(tester);
+      expect(find.text('Post "p1"'), findsOneWidget);
     });
 
     testWidgets('Sign Up opens over Login, and Back returns to it', (
@@ -95,7 +177,7 @@ void main() {
       expect(appBarTitled('Create account'), findsOneWidget);
 
       await tapAndSettle(tester, find.byType(BackButton));
-      expect(find.text('Welcome to ConnectHub'), findsOneWidget);
+      expect(onLogin, findsOneWidget);
     });
   });
 
@@ -119,7 +201,7 @@ void main() {
       await tapAndSettle(tester, destination('Profile'));
       expect(appBarTitled('Profile'), findsOneWidget);
       await tapAndSettle(tester, destination('Feed'));
-      expect(appBarTitled('ConnectHub'), findsOneWidget);
+      expect(onFeed, findsOneWidget);
     });
   });
 
@@ -130,11 +212,10 @@ void main() {
 
       await tapAndSettle(tester, find.text('Open a sample post'));
       expect(find.text('Post "p1"'), findsOneWidget);
-      // Root-level routes sit above the shell, so the tab bar is hidden.
       expect(find.byType(NavigationBar), findsNothing);
 
       await tapAndSettle(tester, find.byType(BackButton));
-      expect(appBarTitled('ConnectHub'), findsOneWidget);
+      expect(onFeed, findsOneWidget);
       expect(selectedTab(tester), 0);
     });
 
@@ -161,7 +242,7 @@ void main() {
 
       await tapAndSettle(tester, find.byType(BackButton));
       await tapAndSettle(tester, find.byType(BackButton));
-      expect(appBarTitled('ConnectHub'), findsOneWidget);
+      expect(onFeed, findsOneWidget);
     });
 
     testWidgets('New post opens as a full-screen dialog with a close button', (
@@ -174,7 +255,17 @@ void main() {
       expect(find.byType(CloseButton), findsOneWidget);
 
       await tapAndSettle(tester, find.byType(CloseButton));
-      expect(appBarTitled('ConnectHub'), findsOneWidget);
+      expect(onFeed, findsOneWidget);
+    });
+
+    testWidgets('a full-screen dialog opened directly closes to the Feed', (
+      tester,
+    ) async {
+      await pumpConnectHub(tester, signedIn: true, initialLocation: '/compose');
+      expect(appBarTitled('New post'), findsOneWidget);
+
+      await tapAndSettle(tester, find.byTooltip('Go to the feed'));
+      expect(onFeed, findsOneWidget);
     });
 
     testWidgets('Settings and Edit profile open from the Profile tab, and '
@@ -194,9 +285,7 @@ void main() {
       expect(selectedTab(tester), 4);
     });
 
-    testWidgets('someone else\'s profile opens above the shell', (
-      tester,
-    ) async {
+    testWidgets("someone else's profile opens above the shell", (tester) async {
       await pumpConnectHub(tester, signedIn: true);
 
       await tapAndSettle(tester, find.text('Open a sample profile'));

@@ -1,19 +1,21 @@
-import 'package:connect_hub/core/design_system/design_system.dart';
+import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/features/auth/sign_up/bloc/sign_up_bloc.dart';
+import 'package:connect_hub/features/auth/sign_up/sign_up_view.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Placeholder for the Sign Up screen (the real form arrives in Phase 2).
+/// Wires the Sign Up screen. Like Login, success needs no navigation here:
+/// the new session moves the router's gate to the Feed (or to the return
+/// address in the URL).
 class SignUpPage extends StatelessWidget {
   const SignUpPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create account')),
-      body: const EmptyStateView(
-        icon: Icons.person_add_alt_1_outlined,
-        title: 'Create account',
-        message: 'The sign-up form arrives in Phase 2.',
-      ),
+    return BlocProvider(
+      create: (_) => getIt<SignUpBloc>(),
+      child: SignUpView(onSignIn: () => context.pop()),
     );
   }
 }

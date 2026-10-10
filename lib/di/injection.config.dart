@@ -10,7 +10,33 @@
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 
-import 'package:connect_hub/core/navigation/placeholder_session.dart' as _i303;
+import 'package:connect_hub/core/common/id_generator.dart' as _i613;
+import 'package:connect_hub/core/network/api/auth_api_service.dart' as _i1000;
+import 'package:connect_hub/core/network/api/fake_auth_api_service.dart'
+    as _i270;
+import 'package:connect_hub/core/network/asset_json_loader.dart' as _i409;
+import 'package:connect_hub/core/network/fake_server/fake_server.dart' as _i698;
+import 'package:connect_hub/core/network/fake_server/network_simulator.dart'
+    as _i608;
+import 'package:connect_hub/core/network/fake_server/seed_loader.dart' as _i483;
+import 'package:connect_hub/core/storage/session_storage.dart' as _i370;
+import 'package:connect_hub/data/repository/api_guard.dart' as _i525;
+import 'package:connect_hub/data/repository/auth_repository_impl.dart' as _i410;
+import 'package:connect_hub/data/repository/session_repository_impl.dart'
+    as _i1055;
+import 'package:connect_hub/di/app_module.dart' as _i781;
+import 'package:connect_hub/domain/repository/auth_repository.dart' as _i288;
+import 'package:connect_hub/domain/repository/session_repository.dart' as _i596;
+import 'package:connect_hub/domain/usecase/login_use_case.dart' as _i199;
+import 'package:connect_hub/domain/usecase/logout_use_case.dart' as _i696;
+import 'package:connect_hub/domain/usecase/sign_up_use_case.dart' as _i958;
+import 'package:connect_hub/domain/usecase/watch_session_use_case.dart' as _i5;
+import 'package:connect_hub/features/auth/bloc/auth_bloc.dart' as _i854;
+import 'package:connect_hub/features/auth/login/bloc/login_bloc.dart' as _i837;
+import 'package:connect_hub/features/auth/sign_up/bloc/sign_up_bloc.dart'
+    as _i611;
+import 'package:flutter/services.dart' as _i281;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart' as _i558;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 
@@ -21,9 +47,68 @@ extension GetItInjectableX on _i174.GetIt {
     _i526.EnvironmentFilter? environmentFilter,
   }) {
     final gh = _i526.GetItHelper(this, environment, environmentFilter);
-    gh.lazySingleton<_i303.PlaceholderSession>(
-      () => _i303.PlaceholderSession(),
+    final appModule = _$AppModule();
+    gh.lazySingleton<_i613.IdGenerator>(() => _i613.IdGenerator());
+    gh.lazySingleton<_i608.NetworkSimulator>(() => _i608.NetworkSimulator());
+    gh.lazySingleton<_i281.AssetBundle>(() => appModule.assetBundle);
+    gh.lazySingleton<_i558.FlutterSecureStorage>(() => appModule.secureStorage);
+    gh.lazySingleton<_i370.SessionStorage>(
+      () => _i370.SessionStorage(gh<_i558.FlutterSecureStorage>()),
+    );
+    gh.lazySingleton<_i409.AssetJsonLoader>(
+      () => _i409.AssetJsonLoader(gh<_i281.AssetBundle>()),
+    );
+    gh.lazySingleton<_i483.SeedLoader>(
+      () => _i483.SeedLoader(gh<_i409.AssetJsonLoader>()),
+    );
+    gh.lazySingleton<_i596.SessionRepository>(
+      () => _i1055.SessionRepositoryImpl(gh<_i370.SessionStorage>()),
+    );
+    gh.lazySingleton<_i525.ApiGuard>(
+      () => _i525.ApiGuard(gh<_i596.SessionRepository>()),
+    );
+    gh.factory<_i5.WatchSessionUseCase>(
+      () => _i5.WatchSessionUseCase(gh<_i596.SessionRepository>()),
+    );
+    gh.lazySingleton<_i698.FakeServer>(
+      () => _i698.FakeServer(gh<_i483.SeedLoader>(), gh<_i613.IdGenerator>()),
+    );
+    gh.lazySingleton<_i1000.AuthApiService>(
+      () => _i270.FakeAuthApiService(
+        gh<_i698.FakeServer>(),
+        gh<_i608.NetworkSimulator>(),
+      ),
+    );
+    gh.lazySingleton<_i288.AuthRepository>(
+      () => _i410.AuthRepositoryImpl(
+        gh<_i1000.AuthApiService>(),
+        gh<_i596.SessionRepository>(),
+        gh<_i525.ApiGuard>(),
+      ),
+    );
+    gh.factory<_i199.LoginUseCase>(
+      () => _i199.LoginUseCase(gh<_i288.AuthRepository>()),
+    );
+    gh.factory<_i696.LogoutUseCase>(
+      () => _i696.LogoutUseCase(gh<_i288.AuthRepository>()),
+    );
+    gh.factory<_i958.SignUpUseCase>(
+      () => _i958.SignUpUseCase(gh<_i288.AuthRepository>()),
+    );
+    gh.factory<_i837.LoginBloc>(
+      () => _i837.LoginBloc(gh<_i199.LoginUseCase>()),
+    );
+    gh.factory<_i854.AuthBloc>(
+      () => _i854.AuthBloc(
+        gh<_i5.WatchSessionUseCase>(),
+        gh<_i696.LogoutUseCase>(),
+      ),
+    );
+    gh.factory<_i611.SignUpBloc>(
+      () => _i611.SignUpBloc(gh<_i958.SignUpUseCase>()),
     );
     return this;
   }
 }
+
+class _$AppModule extends _i781.AppModule {}

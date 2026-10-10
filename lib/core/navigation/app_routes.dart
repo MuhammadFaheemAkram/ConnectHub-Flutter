@@ -33,30 +33,42 @@ part 'app_routes.g.dart';
 // ---------------------------------------------------------------------------
 // 1. Auth
 
-/// Shown while the session is being restored (from Phase 2 on).
+/// Shown while the session is being restored.
+///
+/// [from] is the return address: where the user was going when the gate
+/// stepped in (see `authRedirect`). Non-path fields of a typed route become
+/// query parameters, e.g. `/splash?from=%2Fposts%2Fp3`.
 @TypedGoRoute<SplashRoute>(path: '/splash')
 class SplashRoute extends GoRouteData with $SplashRoute {
-  const SplashRoute();
+  const SplashRoute({this.from});
+
+  final String? from;
 
   @override
   Widget build(BuildContext context, GoRouterState state) => const SplashPage();
 }
 
 /// Sign Up is a *child* of Login, so it opens on top of Login and Back
-/// returns there.
+/// returns there. Both carry the return address ([from]) along, so a deep
+/// link survives creating an account too.
 @TypedGoRoute<LoginRoute>(
   path: '/login',
   routes: [TypedGoRoute<SignUpRoute>(path: 'signup')],
 )
 class LoginRoute extends GoRouteData with $LoginRoute {
-  const LoginRoute();
+  const LoginRoute({this.from});
+
+  final String? from;
 
   @override
-  Widget build(BuildContext context, GoRouterState state) => const LoginPage();
+  Widget build(BuildContext context, GoRouterState state) =>
+      LoginPage(from: from);
 }
 
 class SignUpRoute extends GoRouteData with $SignUpRoute {
-  const SignUpRoute();
+  const SignUpRoute({this.from});
+
+  final String? from;
 
   @override
   Widget build(BuildContext context, GoRouterState state) => const SignUpPage();

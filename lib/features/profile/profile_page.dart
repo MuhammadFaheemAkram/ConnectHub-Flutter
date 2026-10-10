@@ -1,7 +1,10 @@
 import 'package:connect_hub/core/design_system/design_system.dart';
 import 'package:connect_hub/core/navigation/app_routes.dart';
-import 'package:connect_hub/core/navigation/placeholder_session.dart';
-import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/core/navigation/back_to_feed_button.dart';
+import 'package:connect_hub/features/auth/bloc/auth_bloc.dart';
+import 'package:connect_hub/features/auth/bloc/auth_event.dart';
+import 'package:connect_hub/features/auth/bloc/auth_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Placeholder for profiles (the real screen arrives in Phase 5).
@@ -18,7 +21,10 @@ class ProfilePage extends StatelessWidget {
     final userId = this.userId;
     if (userId != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
+        appBar: AppBar(
+          leading: const BackToFeedButton(),
+          title: const Text('Profile'),
+        ),
         body: EmptyStateView(
           icon: Icons.person_outline,
           title: 'Profile',
@@ -26,6 +32,13 @@ class ProfilePage extends StatelessWidget {
         ),
       );
     }
+
+    final email = context.select(
+      (AuthBloc bloc) => switch (bloc.state) {
+        AuthAuthenticated(:final session) => session.email,
+        _ => null,
+      },
+    );
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
@@ -40,7 +53,10 @@ class ProfilePage extends StatelessWidget {
       body: EmptyStateView(
         icon: Icons.account_circle_outlined,
         title: 'Your profile',
-        message: 'Profiles arrive in Phase 5.',
+        message: [
+          if (email != null) 'Signed in as $email.',
+          'Profiles arrive in Phase 5.',
+        ].join('\n'),
         action: Column(
           children: [
             FilledButton.tonal(
@@ -48,15 +64,27 @@ class ProfilePage extends StatelessWidget {
               child: const Text('Edit profile'),
             ),
             const SizedBox(height: AppSpacing.xSmall),
-            // TEMPORARY (Phase 1): signs out of the placeholder session. The
-            // router's gate then returns to Login on its own.
             TextButton(
-              onPressed: getIt<PlaceholderSession>().signOut,
+              onPressed: () => _confirmLogout(context),
               child: const Text('Log out'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Logging out only tells the `AuthBloc`. The router's gate then returns to
+  /// Login on its own.
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Log out?',
+      message: "You'll need to sign in again to use ConnectHub.",
+      confirmLabel: 'Log out',
+    );
+    if (confirmed && context.mounted) {
+      context.read<AuthBloc>().add(const AuthLogoutRequested());
+    }
   }
 }

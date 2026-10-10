@@ -33,8 +33,8 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 | Phase | Scope | Status |
 |------:|-------|:------:|
 | 1 | Foundation: FVM project, design system base, typed routes with a sign-in gate, 5-tab shell, CI | ✅ Done |
-| 2 | Fake auth + session (secure storage, `AuthBloc`, Login / Sign Up) | ⏳ Next |
-| 3 | Feed + fake network + offline cache (drift) | ⬜ |
+| 2 | Fake auth + session: in-memory fake server, secure storage, `AuthBloc`, Login / Sign Up | ✅ Done |
+| 3 | Feed + fake network + offline cache (drift) | ⏳ Next |
 | 4 | Post detail + comments + create post | ⬜ |
 | 5 | Search + bookmarks + profile | ⬜ |
 | 6 | Chat + notifications + settings | ⬜ |
@@ -66,6 +66,7 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 | Navigation | `go_router` + `go_router_builder` (typed routes, `StatefulShellRoute`, sign-in `redirect`) | 1 |
 | Dependency injection | `get_it` + `injectable` (a code-generated composition root) | 1 |
 | State management | `flutter_bloc` (Blocs for the session, auth forms and search; Cubits elsewhere) | 2 |
+| Event transformers | `bloc_concurrency` (`droppable` submits, a `restartable` session subscription) | 2 |
 | Models | `freezed` + `json_serializable` | 2 |
 | Session token | `flutter_secure_storage` (Keychain / Android Keystore) | 2 |
 | Database | `drift` (SQLite), with migrations | 3 |
@@ -90,10 +91,10 @@ lib/
 └── di/         → composition root (get_it + injectable)
 ```
 
-**Navigation and the sign-in gate** (Phase 1):
+**Navigation and the sign-in gate:**
 
 ```
-GoRouter ── redirect: authRedirect(session, location)   ◀── refreshListenable: the session
+GoRouter ── redirect: authRedirect(AuthBloc.state, location)   ◀── refreshListenable: AuthBloc.stream
   │
   ├─ auth routes      /splash, /login, /login/signup         (the only ones reachable while signed out)
   │
@@ -104,8 +105,25 @@ GoRouter ── redirect: authRedirect(session, location)   ◀── refreshLis
      screens          /chats (+ /:conversationId), /settings      → pushed above the tab bar
 ```
 
+**Signing in** (Phase 2):
+
+```
+LoginView ── LoginSubmitted ──▶ LoginBloc (droppable) ──▶ LoginUseCase ──▶ AuthRepository
+                                                                  │  ApiGuard.run(...)
+                                                                  ▼
+                                    FakeAuthApiService ── NetworkSimulator (latency, failures)
+                                                                  │
+                                                                  ▼
+                                                    FakeServer (in memory) ─▶ token + profile
+AuthRepository ─▶ SessionRepository.save ─▶ SessionStorage (Keychain / Keystore)
+                         │ emits SignedIn
+                         ▼
+     AuthBloc ─▶ authenticated ─▶ router re-runs the gate ─▶ the Feed (or the return address)
+```
+
 Key rules:
-- **The router owns the gate.** Screens never check "am I signed in?". `authRedirect` is a pure function, and when the session changes, `refreshListenable` re-runs it.
+- **The router owns the gate.** Screens never check "am I signed in?" or navigate after a sign-in or a logout. `authRedirect` is a pure function, and `refreshListenable` re-runs it whenever the `AuthBloc`'s state changes.
+- **A return address survives the gate.** A deep link (or a screen open when the session expires) travels as `?from=` through the splash, Login and Sign Up. A deliberate logout drops it.
 - **Typed routes only:** no string paths in widgets.
 - **Details sit above the tabs.** They are reachable from several tabs, so each is one route on the root navigator. The tabs keep their state underneath.
 - **Widgets render state; logic lives elsewhere.** Each screen is a Page plus a View (from Phase 2 on).
@@ -126,9 +144,13 @@ ConnectHub/
 │   ├── app/connect_hub_app.dart
 │   ├── core/
 │   │   ├── design_system/          # theme/ (AppTheme, AppColors, tokens) + widgets/
-│   │   ├── navigation/             # app_routes (+ .g.dart), app_router, auth_redirect, placeholder_session
-│   │   └── common/ network/ database/ storage/   # filled in Phases 2–6
-│   ├── data/  domain/              # Phase 2+
+│   │   ├── common/                 # Result, AppException, validators, IdGenerator, DemoAccount, FormStatus
+│   │   ├── navigation/             # app_routes (+ .g.dart), app_router, auth_redirect, stream_listenable, back_to_feed_button
+│   │   ├── network/                # api/ (contracts + fakes), dto/, fake_server/, asset_json_loader
+│   │   ├── storage/                # session_storage (flutter_secure_storage)
+│   │   └── database/               # Phase 3
+│   ├── data/                       # mapper/, repository/ (AuthRepositoryImpl, SessionRepositoryImpl, ApiGuard)
+│   ├── domain/                     # model/ (Session, SessionState), repository/, usecase/
 │   ├── features/                   # splash, auth, shell, feed, search, bookmarks, activity, profile,
 │   │                               # post_detail, comments, create_post, edit_profile, chats, chat_detail, settings
 │   └── di/                         # injection.dart (+ .config.dart)
@@ -156,7 +178,28 @@ Generated code (`*.g.dart`, `*.config.dart`) is committed, so the app runs strai
 fvm dart run build_runner build
 ```
 
-In Phase 1, sign-in is a placeholder: **Continue** on the Login screen signs in, and **Log out** on the Profile tab signs out.
+**Signing in:** tap **Use demo account**, then **Sign in** (`demo@connecthub.app` / `connecthub`). You can also create an account. The fake server lives in memory, so accounts you create last until the app restarts. The demo account always exists, so its session survives restarts.
+
+---
+
+## 🌐 How the Fake Backend Works
+
+There is no server. `FakeServer` is an in-memory stand-in that owns the data and its rules: accounts and tokens now, posts, comments and chats in later phases.
+- **Seed:** it seeds itself on first use from [`assets/json/`](assets/json/), the iOS edition's JSON (Phase 2 uses `auth_user.json`).
+- **Access:** the app reaches it only through Retrofit-style API services (`AuthApiService` → `FakeAuthApiService`), so a real `dio` client could replace them without changing any caller.
+- **Transport:** `NetworkSimulator` adds latency (800 ms for sign-in) and can fail every request, as if offline (`AppConfig.simulateNetworkErrors`).
+- **Errors:** the server throws typed `AppException`s:
+  - "Incorrect email or password." for a wrong password *or* an unknown email;
+  - "An account with this email already exists.";
+  - a 401 for a bad token.
+- **Tokens:** they look like `fake.<userId>.<random>`. Any token for an existing user is valid, so the demo session survives restarts.
+
+## 🔐 How the Session Is Stored
+
+- **Secure storage:** the session (token, user id and email) is stored with `flutter_secure_storage`, which uses the iOS Keychain or the Android Keystore. A token is a credential: it doesn't belong in `shared_preferences`, which are plain files.
+- **No Android backup:** `android:allowBackup="false"` keeps it out of cloud backups. Restored Keystore data can't be decrypted on another device anyway.
+- **Restore:** `SessionRepository.watchSession()` emits the restored state, then every change: signed in, or signed out with a reason (`none`, `loggedOut`, `expired`). The `AuthBloc` follows it with `emit.forEach`.
+- **Expiry:** `ApiGuard` wraps every API call. A 401 expires the session once, for every repository, and Login then says why.
 
 ---
 
@@ -168,19 +211,23 @@ fvm dart format --output=none --set-exit-if-changed .
 fvm flutter test
 ```
 
-**40 tests** after Phase 1:
-- **The sign-in gate:**
-  - every rule of `authRedirect`;
-  - the real app: signing in and out, deep links while signed out, Sign Up over Login.
-- **Navigation:**
-  - the five tabs;
-  - the root-level screens cover the tab bar, and Back returns to the same tab;
-  - the full-screen dialogs;
-  - every typed route's location.
-- **Design system:**
-  - the themes and `AppColors`, including WCAG contrast checks;
-  - the state views and `AppTextField`.
-- **DI:** a smoke test that resolves the real container.
+**138 tests** after Phase 2:
+- **Auth:**
+  - the validators;
+  - the fake server (accounts, tokens, restarts) and the fake API;
+  - secure session storage;
+  - `SessionRepository` (current state, then changes; a sign-in during the restore wins);
+  - `AuthRepository` and `ApiGuard`.
+- **Blocs** (`bloc_test`):
+  - `AuthBloc`;
+  - `LoginBloc` / `SignUpBloc`: quiet errors until the first submit, then live, plus trimming and `droppable()` double submits.
+- **Views** (`MockBloc`): the Login and Sign Up forms.
+- **The gate:**
+  - every rule of `authRedirect`, including unsafe return addresses;
+  - app-level flows on the real stack: demo sign-in, a wrong password, sign-up, logout with confirmation, a deep link through sign-in, an expired session.
+- **Navigation:** the five tabs, the root-level screens above the shell, the full-screen dialogs, typed locations.
+- **Design system:** themes and contrast, and the shared widgets.
+- **DI:** a smoke test of the real container.
 
 CI (`.github/workflows/flutter-ci.yml`) runs on every push to `main` and every pull request. It installs the FVM-pinned Flutter, checks that the committed generated code is up to date, then runs format, analyze and test.
 
@@ -198,7 +245,7 @@ CI (`.github/workflows/flutter-ci.yml`) runs on every push to `main` and every p
 |---|---|---|---|
 | UI | Jetpack Compose | SwiftUI | widgets + `material_ui` |
 | Screen state | ViewModel + StateFlow | `@Observable` view models | Cubit / Bloc |
-| Session gate | splash + nav graphs | `RootView` phase switch | go_router `redirect` + `refreshListenable` |
+| Session gate | splash + nav graphs | `RootView` phase switch | `AuthBloc` + go_router `redirect` + `refreshListenable` |
 | Tabs | `NavigationBar` + drawer | `TabView` | `StatefulShellRoute` + `NavigationBar` |
 | DI | Hilt | `AppEnvironment` | `get_it` + `injectable` |
 | Cache | Room | SwiftData | drift |
@@ -209,6 +256,7 @@ CI (`.github/workflows/flutter-ci.yml`) runs on every push to `main` and every p
 ## 📚 Documentation
 
 - [Phase 1 — Foundation](docs/PHASE_1_SUMMARY.md)
+- [Phase 2 — Fake Auth + Session](docs/PHASE_2_SUMMARY.md)
 
 ---
 
