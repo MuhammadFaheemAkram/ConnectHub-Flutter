@@ -4,6 +4,7 @@ import 'package:connect_hub/core/common/demo_account.dart';
 import 'package:connect_hub/core/network/asset_json_loader.dart';
 import 'package:connect_hub/core/network/dto/create_post_request_dto.dart';
 import 'package:connect_hub/core/network/dto/post_dto.dart';
+import 'package:connect_hub/core/network/dto/update_profile_request_dto.dart';
 import 'package:connect_hub/core/network/fake_server/fake_server.dart';
 import 'package:connect_hub/core/network/fake_server/seed_loader.dart';
 import 'package:flutter/services.dart';
@@ -208,8 +209,184 @@ void main() {
         expect(removed.bookmarkedAt, isNull);
       },
     );
+
+    test("the list is the viewer's own, the most recently bookmarked "
+        'first', () async {
+      var now = testNow;
+      server = newFakeServer(clock: Clock(() => now));
+      expect(await server.getBookmarks('u_demo'), isEmpty);
+
+      for (final id in ['p7', 'p2', 'p12']) {
+        await server.setBookmarked('u_demo', id, bookmarked: true);
+        now = now.add(const Duration(minutes: 1));
+      }
+      await server.setBookmarked('u_other', 'p5', bookmarked: true);
+
+      final bookmarks = await server.getBookmarks('u_demo');
+      expect(bookmarks.map((post) => post.id), ['p12', 'p2', 'p7']);
+      expect(bookmarks.every((post) => post.bookmarkedAt != null), isTrue);
+    });
   });
 
+  group('users', () {
+    test('a profile is public: no email', () async {
+      final ada = await server.getUser('u_ada');
+
+      expect(ada.name, 'Ada Lovelace');
+      expect(ada.bio, 'Enchantress of numbers.');
+      expect(ada.followersCount, 4820);
+      expect(ada.email, isNull);
+    });
+
+    test("a user's posts: all of them, newest first", () async {
+      final posts = await server.getUserPosts('u_demo', 'u_ada');
+
+      expect(posts.map((post) => post.id), ['p1', 'p6', 'p11']);
+    });
+
+    test("a user's posts come as the viewer sees them", () async {
+      await server.setLiked('u_demo', 'p6', liked: true);
+
+      final posts = await server.getUserPosts('u_demo', 'u_ada');
+
+      expect(posts.singleWhere((post) => post.id == 'p6').isLiked, isTrue);
+    });
+
+    test('an unknown user, and so their posts, are not found', () {
+      expect(server.getUser('u_nobody'), throwsA(isA<NotFoundException>()));
+      expect(
+        server.getUserPosts('u_demo', 'u_nobody'),
+        throwsA(isA<NotFoundException>()),
+      );
+    });
+  });
+
+  group('update profile', () {
+    const request = UpdateProfileRequestDto(
+      name: '  Demo Person ',
+      bio: ' Testing time-based logic. ',
+      avatarUrl: ' https://example.com/me.png ',
+    );
+
+    test('saves trimmed values and answers with my own record', () async {
+      final me = await server.updateMe('u_demo', request);
+
+      expect(me.name, 'Demo Person');
+      expect(me.bio, 'Testing time-based logic.');
+      expect(me.avatarUrl, 'https://example.com/me.png');
+      expect(me.email, DemoAccount.email);
+      // Counts aren't the user's to edit.
+      expect(me.followersCount, 128);
+    });
+
+    test('renames me on every post and comment I ever wrote', () async {
+      await server.updateMe('u_demo', request);
+
+      final p16 = await server.getPost('u_demo', 'p16');
+      expect(p16.author.name, 'Demo Person');
+      expect(p16.author.avatarUrl, 'https://example.com/me.png');
+      final comment = await server.addComment('u_demo', 'p1', 'Hi');
+      expect(comment.author.name, 'Demo Person');
+      expect((await server.getUser('u_demo')).name, 'Demo Person');
+    });
+
+    test('an empty avatar URL removes the picture', () async {
+      final me = await server.updateMe(
+        'u_demo',
+        const UpdateProfileRequestDto(
+          name: 'Demo User',
+          bio: '',
+          avatarUrl: '',
+        ),
+      );
+
+      expect(me.avatarUrl, isNull);
+      expect(me.bio, isEmpty);
+    });
+
+    test('a request that breaks the rules is rejected (a 400)', () {
+      for (final invalid in [
+        const UpdateProfileRequestDto(name: ' D ', bio: ''),
+        UpdateProfileRequestDto(name: 'Demo', bio: 'a' * 161),
+        const UpdateProfileRequestDto(
+          name: 'Demo',
+          bio: '',
+          avatarUrl: 'not a url',
+        ),
+      ]) {
+        expect(
+          server.updateMe('u_demo', invalid),
+          throwsA(isA<FormatException>()),
+        );
+      }
+    });
+  });
+
+  group('search', () {
+    /// Searches as the demo user and checks the ids found, in order.
+    Future<void> expectFound(
+      String query, {
+      List<String> people = const [],
+      List<String> posts = const [],
+    }) async {
+      final response = await server.search('u_demo', query);
+      expect(
+        [for (final user in response.users) user.id],
+        people,
+        reason: 'people matching "$query"',
+      );
+      expect(
+        [for (final post in response.posts) post.id],
+        posts,
+        reason: 'posts matching "$query"',
+      );
+    }
+
+    test(
+      'finds people by name and posts by their author, ignoring case',
+      () async {
+        await expectFound('ada', people: ['u_ada'], posts: ['p1', 'p6', 'p11']);
+        await expectFound(
+          '  ADA ',
+          people: ['u_ada'],
+          posts: ['p1', 'p6', 'p11'],
+        );
+      },
+    );
+
+    test('finds people by bio, and posts by content', () async {
+      await expectFound('moon', people: ['u_katherine']);
+      await expectFound('cache', posts: ['p15']);
+    });
+
+    test(
+      'lists the most followed people first, and posts newest first',
+      () async {
+        final response = await server.search('u_demo', 'in');
+
+        expect(response.users.map((user) => user.id), [
+          'u_linus',
+          'u_alan',
+          'u_katherine',
+        ]);
+        expect(response.posts.take(4).map((post) => post.id), [
+          'p1',
+          'p2',
+          'p3',
+          'p16',
+        ]);
+      },
+    );
+
+    test('leaves the viewer out of the people, not out of the posts', () async {
+      await expectFound('demo', posts: ['p16', 'p17', 'p8']);
+    });
+
+    test('a blank query, or one nothing matches, finds nothing', () async {
+      await expectFound('   ');
+      await expectFound('zzz');
+    });
+  });
   group('one post', () {
     test('comes as the viewer sees it', () async {
       await server.setLiked('u_demo', 'p3', liked: true);

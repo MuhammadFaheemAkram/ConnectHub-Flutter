@@ -35,6 +35,9 @@ class FakePostRepository implements PostRepository {
   Result<void> likeResult = const Ok(null);
   Result<void> bookmarkResult = const Ok(null);
 
+  /// While set and not completed, `setBookmarked` waits for it.
+  Completer<void>? bookmarkGate;
+
   final likeCalls = <({String postId, bool liked})>[];
   final bookmarkCalls = <({String postId, bool bookmarked})>[];
 
@@ -85,6 +88,7 @@ class FakePostRepository implements PostRepository {
     required bool bookmarked,
   }) async {
     bookmarkCalls.add((postId: postId, bookmarked: bookmarked));
+    await bookmarkGate?.future;
     return bookmarkResult;
   }
 

@@ -22,8 +22,7 @@ class FeedPage extends StatelessWidget {
             PostDetailRoute(postId: postId).push<void>(context),
         onOpenComments: (postId) =>
             CommentsRoute(postId: postId).push<void>(context),
-        onOpenProfile: (userId) =>
-            UserProfileRoute(userId: userId).push<void>(context),
+        onOpenProfile: (userId) => openProfile(context, userId),
         onOpenChats: () => const ChatsRoute().push<void>(context),
         onCreatePost: () => const CreatePostRoute().push<void>(context),
       ),

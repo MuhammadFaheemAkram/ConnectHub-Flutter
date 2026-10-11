@@ -99,13 +99,24 @@ void main() {
     });
   });
 
+  group('bio', () {
+    test('is optional', () => expect(Validators.bio(''), isNull));
+
+    test('is at most 160 characters, as people count them', () {
+      const message = 'Bio must be 160 characters or fewer.';
+      expect(Validators.bio('a' * 160), isNull);
+      expect(Validators.bio('a' * 161), message);
+      expect(Validators.bio('👋' * 160), isNull);
+    });
+  });
+
   group('image URL', () {
     test('is optional', () {
       expect(Validators.imageUrl(''), isNull);
       expect(Validators.imageUrl('   '), isNull);
     });
 
-    test('must be an http or https URL with a host', () {
+    test('must be an http or https URL with a host (avatars too)', () {
       const message = 'Enter a valid image URL, or leave it empty.';
       expect(Validators.imageUrl('https://picsum.photos/600/400'), isNull);
       expect(Validators.imageUrl(' http://example.com/a.png '), isNull);

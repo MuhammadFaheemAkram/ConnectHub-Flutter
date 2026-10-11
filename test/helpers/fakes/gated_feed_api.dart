@@ -14,7 +14,7 @@ class GatedFeedApi implements FeedApiService {
   final FeedApiService _inner;
 
   /// Requests as `feed:<cursor or top>`, `post:<postId>`, `create`,
-  /// `like:<postId>`, `bookmark:<postId>`.
+  /// `like:<postId>`, `bookmark:<postId>`, `bookmarks`.
   final requests = <String>[];
 
   /// While set and not completed, requests wait for it.
@@ -56,5 +56,12 @@ class GatedFeedApi implements FeedApiService {
     requests.add('bookmark:$postId');
     await gate?.future;
     return _inner.setBookmarked(postId, bookmarked: bookmarked);
+  }
+
+  @override
+  Future<List<PostDto>> getBookmarks() async {
+    requests.add('bookmarks');
+    await gate?.future;
+    return _inner.getBookmarks();
   }
 }

@@ -19,8 +19,7 @@ class PostDetailPage extends StatelessWidget {
       create: (_) => getIt<PostDetailCubit>(param1: postId)..load(),
       child: PostDetailView(
         onOpenComments: () => CommentsRoute(postId: postId).push<void>(context),
-        onOpenProfile: (userId) =>
-            UserProfileRoute(userId: userId).push<void>(context),
+        onOpenProfile: (userId) => openProfile(context, userId),
       ),
     );
   }

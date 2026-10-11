@@ -16,6 +16,7 @@ class FakeFeedApiService implements FeedApiService {
 
   static const _readLatency = Duration(milliseconds: 700);
   static const _createLatency = Duration(milliseconds: 600);
+  static const _bookmarksLatency = Duration(milliseconds: 500);
   static const _writeLatency = Duration(milliseconds: 350);
 
   @override
@@ -49,5 +50,11 @@ class FakeFeedApiService implements FeedApiService {
   }) async {
     final userId = await _client.authenticate(_writeLatency);
     return _server.setBookmarked(userId, postId, bookmarked: bookmarked);
+  }
+
+  @override
+  Future<List<PostDto>> getBookmarks() async {
+    final userId = await _client.authenticate(_bookmarksLatency);
+    return _server.getBookmarks(userId);
   }
 }

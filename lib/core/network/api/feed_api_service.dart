@@ -5,8 +5,7 @@ import 'package:connect_hub/core/network/dto/post_page_dto.dart';
 /// The feed and post endpoints, Retrofit-style: one method per request.
 ///
 /// Every call is authenticated: the server answers for the signed-in user,
-/// so `isLiked` and `bookmarkedAt` are that user's own. Phase 5 adds the
-/// bookmarks list.
+/// so `isLiked` and `bookmarkedAt` are that user's own.
 abstract interface class FeedApiService {
   /// `GET /feed?cursor=…&limit=…`: newest first, [limit] posts per page.
   /// Pass the previous page's `nextCursor` to get the page after it.
@@ -23,4 +22,8 @@ abstract interface class FeedApiService {
 
   /// `PUT` / `DELETE /posts/{postId}/bookmark`
   Future<PostDto> setBookmarked(String postId, {required bool bookmarked});
+
+  /// `GET /me/bookmarks`: the posts the signed-in user bookmarked, the most
+  /// recently bookmarked first.
+  Future<List<PostDto>> getBookmarks();
 }

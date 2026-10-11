@@ -18,6 +18,7 @@ abstract final class Validators {
   static const nameMaxLength = 50;
   static const postMaxLength = 280;
   static const commentMaxLength = 280;
+  static const bioMaxLength = 160;
 
   static String? email(String value) {
     final email = value.trim();
@@ -62,8 +63,13 @@ abstract final class Validators {
     return null;
   }
 
+  /// Optional, and counted like a post: in characters as people see them.
+  static String? bio(String value) => lengthOf(value) > bioMaxLength
+      ? 'Bio must be $bioMaxLength characters or fewer.'
+      : null;
+
   /// Optional: empty is fine; anything else must be an `http`/`https` URL
-  /// with a host.
+  /// with a host. Used for post images and avatars alike.
   static String? imageUrl(String value) {
     final url = value.trim();
     if (url.isEmpty) return null;

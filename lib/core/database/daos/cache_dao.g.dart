@@ -11,6 +11,7 @@ mixin _$CacheDaoMixin on DatabaseAccessor<AppDatabase> {
   $CommentsTable get comments => attachedDatabase.comments;
   $FeedItemsTable get feedItems => attachedDatabase.feedItems;
   $BookmarksTable get bookmarks => attachedDatabase.bookmarks;
+  $RecentSearchesTable get recentSearches => attachedDatabase.recentSearches;
   CacheDaoManager get managers => CacheDaoManager(this);
 }
 
@@ -27,4 +28,9 @@ class CacheDaoManager {
       $$FeedItemsTableTableManager(_db.attachedDatabase, _db.feedItems);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db.attachedDatabase, _db.bookmarks);
+  $$RecentSearchesTableTableManager get recentSearches =>
+      $$RecentSearchesTableTableManager(
+        _db.attachedDatabase,
+        _db.recentSearches,
+      );
 }

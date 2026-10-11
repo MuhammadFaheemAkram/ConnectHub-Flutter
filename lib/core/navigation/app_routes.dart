@@ -1,4 +1,6 @@
 import 'package:connect_hub/features/activity/activity_page.dart';
+import 'package:connect_hub/features/auth/bloc/auth_bloc.dart';
+import 'package:connect_hub/features/auth/bloc/auth_state.dart';
 import 'package:connect_hub/features/auth/login/login_page.dart';
 import 'package:connect_hub/features/auth/sign_up/sign_up_page.dart';
 import 'package:connect_hub/features/bookmarks/bookmarks_page.dart';
@@ -14,6 +16,7 @@ import 'package:connect_hub/features/search/search_page.dart';
 import 'package:connect_hub/features/settings/settings_page.dart';
 import 'package:connect_hub/features/shell/main_shell.dart';
 import 'package:connect_hub/features/splash/splash_page.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -225,17 +228,45 @@ class CommentsRoute extends GoRouteData with $CommentsRoute {
       CommentsPage(postId: postId);
 }
 
-/// `/users/:userId`: someone else's profile.
+/// `/users/:userId`: someone else's profile. Open it with [openProfile].
 @TypedGoRoute<UserProfileRoute>(path: '/users/:userId')
 class UserProfileRoute extends GoRouteData with $UserProfileRoute {
   const UserProfileRoute({required this.userId});
 
   final String userId;
 
+  /// My own id goes to the Profile tab instead (a deep link, say): one "me"
+  /// screen, the one with "Edit profile" and "Log out".
+  @override
+  String? redirect(BuildContext context, GoRouterState state) =>
+      _isSignedInUser(context, userId) ? const ProfileRoute().location : null;
+
   @override
   Widget build(BuildContext context, GoRouterState state) =>
       ProfilePage(userId: userId);
 }
+
+/// Opens [userId]'s profile from any screen.
+///
+/// Someone else's profile is pushed above the tabs. Mine is the Profile tab,
+/// so the app switches to it (`go`) instead: pushing would put a second copy
+/// of the tab shell on the stack, which the Navigator rejects (duplicate page
+/// keys), and the redirect above can't turn a push into a tab switch.
+void openProfile(BuildContext context, String userId) {
+  if (_isSignedInUser(context, userId)) {
+    const ProfileRoute().go(context);
+  } else {
+    UserProfileRoute(userId: userId).push<void>(context);
+  }
+}
+
+/// Whether [userId] is the signed-in user, according to the same `AuthBloc`
+/// the sign-in gate uses (it sits above the router).
+bool _isSignedInUser(BuildContext context, String userId) =>
+    switch (context.read<AuthBloc>().state) {
+      AuthAuthenticated(:final session) => session.userId == userId,
+      _ => false,
+    };
 
 /// `/compose`: a full-screen dialog (a close button instead of Back, and it
 /// slides up), the Material counterpart of an iOS sheet.

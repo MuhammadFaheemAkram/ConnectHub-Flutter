@@ -1,9 +1,12 @@
 import 'package:clock/clock.dart';
 import 'package:connect_hub/core/database/app_database.dart';
+import 'package:connect_hub/core/database/daos/bookmarks_dao.dart';
 import 'package:connect_hub/core/database/daos/cache_dao.dart';
 import 'package:connect_hub/core/database/daos/comments_dao.dart';
 import 'package:connect_hub/core/database/daos/feed_dao.dart';
 import 'package:connect_hub/core/database/daos/posts_dao.dart';
+import 'package:connect_hub/core/database/daos/search_dao.dart';
+import 'package:connect_hub/core/database/daos/users_dao.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
@@ -37,6 +40,15 @@ abstract class AppModule {
 
   @lazySingleton
   CommentsDao commentsDao(AppDatabase database) => database.commentsDao;
+
+  @lazySingleton
+  UsersDao usersDao(AppDatabase database) => database.usersDao;
+
+  @lazySingleton
+  BookmarksDao bookmarksDao(AppDatabase database) => database.bookmarksDao;
+
+  @lazySingleton
+  SearchDao searchDao(AppDatabase database) => database.searchDao;
 
   @lazySingleton
   CacheDao cacheDao(AppDatabase database) => database.cacheDao;

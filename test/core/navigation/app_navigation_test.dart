@@ -86,8 +86,8 @@ void main() {
       await tester.tapAndSettle(find.text('Create an account'));
 
       Finder field(String label) => find.widgetWithText(TextField, label);
-      await tester.enterText(field('Name'), 'Ada Lovelace');
-      await tester.enterText(field('Email'), 'ada@example.com');
+      await tester.enterText(field('Name'), 'Nova Newcomer');
+      await tester.enterText(field('Email'), 'nova@example.com');
       await tester.enterText(field('Password'), 'engines');
       await tester.enterText(field('Confirm password'), 'engines');
       await tester.tapAndSettle(
@@ -95,11 +95,11 @@ void main() {
       );
 
       expect(onFeed, findsOneWidget);
+      // The Profile tab shows the new account, as the server created it.
       await tester.tapAndSettle(destination('Profile'));
-      expect(
-        find.textContaining('Signed in as ada@example.com'),
-        findsOneWidget,
-      );
+      expect(find.text('Nova Newcomer'), findsOneWidget);
+      expect(find.text('New to ConnectHub 👋'), findsOneWidget);
+      expect(find.text("You haven't posted yet."), findsOneWidget);
     });
 
     testWidgets('logging out asks first, then returns to Login', (
@@ -275,7 +275,8 @@ void main() {
 
       await tester.tapAndSettle(find.text('Ada Lovelace').first);
 
-      expect(find.text('Profile "u_ada" arrives in Phase 5.'), findsOneWidget);
+      expect(appBarTitled('Profile'), findsOneWidget);
+      expect(find.text('Enchantress of numbers.'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
     });
   });

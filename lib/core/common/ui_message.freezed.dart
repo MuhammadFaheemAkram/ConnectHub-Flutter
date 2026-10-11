@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$UiMessage {
 
- int get id; String get text;
+ int get id; String get text;/// A button on the message, such as Undo.
+ UiMessageAction? get action;
 /// Create a copy of UiMessage
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -27,20 +28,20 @@ $UiMessageCopyWith<UiMessage> get copyWith => _$UiMessageCopyWithImpl<UiMessage>
 @override
 bool operator ==(Object other) {
   final _this = this as UiMessage;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is UiMessage&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.text, _this.text) || other.text == _this.text));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is UiMessage&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.text, _this.text) || other.text == _this.text)&&(identical(other.action, _this.action) || other.action == _this.action));
 }
 
 
 @override
 int get hashCode {
   final _this = this as UiMessage;
-  return Object.hash(runtimeType,_this.id,_this.text);
+  return Object.hash(runtimeType,_this.id,_this.text,_this.action);
 }
 
 @override
 String toString() {
   final _this = this as UiMessage;
-  return 'UiMessage(id: ${_this.id}, text: ${_this.text})';
+  return 'UiMessage(id: ${_this.id}, text: ${_this.text}, action: ${_this.action})';
 }
 
 
@@ -51,7 +52,7 @@ abstract mixin class $UiMessageCopyWith<$Res>  {
   factory $UiMessageCopyWith(UiMessage value, $Res Function(UiMessage) _then) = _$UiMessageCopyWithImpl;
 @useResult
 $Res call({
- int id, String text
+ int id, String text, UiMessageAction? action
 });
 
 
@@ -68,11 +69,12 @@ class _$UiMessageCopyWithImpl<$Res>
 
 /// Create a copy of UiMessage
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? text = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? text = null,Object? action = freezed,}) {
   return _then(UiMessage(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,text: null == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
-as String,
+as String,action: freezed == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
+as UiMessageAction?,
   ));
 }
 
@@ -157,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String text)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String text,  UiMessageAction? action)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _UiMessage() when $default != null:
-return $default(_that.id,_that.text);case _:
+return $default(_that.id,_that.text,_that.action);case _:
   return orElse();
 
 }
@@ -178,10 +180,10 @@ return $default(_that.id,_that.text);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String text)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String text,  UiMessageAction? action)  $default,) {final _that = this;
 switch (_that) {
 case _UiMessage():
-return $default(_that.id,_that.text);case _:
+return $default(_that.id,_that.text,_that.action);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -198,10 +200,10 @@ return $default(_that.id,_that.text);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String text)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String text,  UiMessageAction? action)?  $default,) {final _that = this;
 switch (_that) {
 case _UiMessage() when $default != null:
-return $default(_that.id,_that.text);case _:
+return $default(_that.id,_that.text,_that.action);case _:
   return null;
 
 }
@@ -213,11 +215,13 @@ return $default(_that.id,_that.text);case _:
 
 
 class _UiMessage implements UiMessage {
-  const _UiMessage({required this.id, required this.text});
+  const _UiMessage({required this.id, required this.text, this.action});
   
 
 @override final  int id;
 @override final  String text;
+/// A button on the message, such as Undo.
+@override final  UiMessageAction? action;
 
 /// Create a copy of UiMessage
 /// with the given fields replaced by the non-null parameter values.
@@ -229,18 +233,18 @@ _$UiMessageCopyWith<_UiMessage> get copyWith => __$UiMessageCopyWithImpl<_UiMess
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _UiMessage&&(identical(other.id, id) || other.id == id)&&(identical(other.text, text) || other.text == text));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _UiMessage&&(identical(other.id, id) || other.id == id)&&(identical(other.text, text) || other.text == text)&&(identical(other.action, action) || other.action == action));
 }
 
 
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,text);
+    return Object.hash(runtimeType,id,text,action);
 }
 
 @override
 String toString() {
-    return 'UiMessage(id: $id, text: $text)';
+    return 'UiMessage(id: $id, text: $text, action: $action)';
 }
 
 
@@ -251,7 +255,7 @@ abstract mixin class _$UiMessageCopyWith<$Res> implements $UiMessageCopyWith<$Re
   factory _$UiMessageCopyWith(_UiMessage value, $Res Function(_UiMessage) _then) = __$UiMessageCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String text
+ int id, String text, UiMessageAction? action
 });
 
 
@@ -268,11 +272,12 @@ class __$UiMessageCopyWithImpl<$Res>
 
 /// Create a copy of UiMessage
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? text = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? text = null,Object? action = freezed,}) {
   return _then(_UiMessage(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,text: null == text ? _self.text : text // ignore: cast_nullable_to_non_nullable
-as String,
+as String,action: freezed == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
+as UiMessageAction?,
   ));
 }
 

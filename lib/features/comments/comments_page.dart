@@ -17,8 +17,7 @@ class CommentsPage extends StatelessWidget {
     return BlocProvider(
       create: (_) => getIt<CommentsCubit>(param1: postId)..load(),
       child: CommentsView(
-        onOpenProfile: (userId) =>
-            UserProfileRoute(userId: userId).push<void>(context),
+        onOpenProfile: (userId) => openProfile(context, userId),
       ),
     );
   }

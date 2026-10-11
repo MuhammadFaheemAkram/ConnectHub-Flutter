@@ -12,5 +12,21 @@ part 'ui_message.freezed.dart';
 /// that repeats is reported again instead of being swallowed as "no change".
 @freezed
 abstract class UiMessage with _$UiMessage {
-  const factory UiMessage({required int id, required String text}) = _UiMessage;
+  const factory UiMessage({
+    required int id,
+    required String text,
+
+    /// A button on the message, such as Undo.
+    UiMessageAction? action,
+  }) = _UiMessage;
+}
+
+/// A button a message can offer. State stays plain data: the View maps the
+/// action to the Cubit method that performs it.
+enum UiMessageAction {
+  undo('Undo');
+
+  const UiMessageAction(this.label);
+
+  final String label;
 }

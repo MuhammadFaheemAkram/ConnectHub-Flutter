@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'generated/schema.dart';
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
+import 'generated/schema_v3.dart' as v3;
 
 // Migration tests, set up by `drift_dev make-migrations`. The `generated/`
 // folder holds a snapshot of every exported schema version
@@ -104,6 +105,109 @@ void main() {
           v2.BookmarksData(postId: 'p1', bookmarkedAt: bookmarkedAt),
         ]);
         expect(await newDb.select(newDb.comments).get(), isEmpty);
+      },
+    );
+  });
+
+  test('v2 → v3 keeps every cached author, post, feed item, bookmark and '
+      'comment, and starts with no recent searches', () async {
+    const createdAt = '2026-10-11T09:40:00.000Z';
+    const bookmarkedAt = '2026-10-11T10:00:00.000Z';
+    const commentedAt = '2026-10-11T10:30:00.000Z';
+
+    await verifier.testWithDataIntegrity(
+      oldVersion: 2,
+      newVersion: 3,
+      createOld: v2.DatabaseAtV2.new,
+      createNew: v3.DatabaseAtV3.new,
+      openTestedDatabase: AppDatabase.new,
+      createItems: (batch, oldDb) {
+        batch
+          ..insertAll(oldDb.users, const [
+            v2.UsersData(
+              id: 'u_ada',
+              name: 'Ada Lovelace',
+              bio: 'Enchantress of numbers.',
+              followersCount: 4820,
+              followingCount: 312,
+            ),
+            v2.UsersData(
+              id: 'u_grace',
+              name: 'Grace Hopper',
+              bio: '',
+              followersCount: 9120,
+              followingCount: 87,
+            ),
+          ])
+          ..insertAll(oldDb.posts, const [
+            v2.PostsData(
+              id: 'p1',
+              authorId: 'u_ada',
+              content: 'Just shipped the scheduler.',
+              createdAt: createdAt,
+              likeCount: 142,
+              commentCount: 1,
+              isLiked: 0,
+            ),
+          ])
+          ..insertAll(oldDb.feedItems, const [v2.FeedItemsData(postId: 'p1')])
+          ..insertAll(oldDb.bookmarks, const [
+            v2.BookmarksData(postId: 'p1', bookmarkedAt: bookmarkedAt),
+          ])
+          ..insertAll(oldDb.comments, const [
+            v2.CommentsData(
+              id: 'c1',
+              postId: 'p1',
+              authorId: 'u_grace',
+              content: 'Lovely work.',
+              createdAt: commentedAt,
+            ),
+          ]);
+      },
+      validateItems: (newDb) async {
+        expect(await newDb.select(newDb.users).get(), const [
+          v3.UsersData(
+            id: 'u_ada',
+            name: 'Ada Lovelace',
+            bio: 'Enchantress of numbers.',
+            followersCount: 4820,
+            followingCount: 312,
+          ),
+          v3.UsersData(
+            id: 'u_grace',
+            name: 'Grace Hopper',
+            bio: '',
+            followersCount: 9120,
+            followingCount: 87,
+          ),
+        ]);
+        expect(await newDb.select(newDb.posts).get(), const [
+          v3.PostsData(
+            id: 'p1',
+            authorId: 'u_ada',
+            content: 'Just shipped the scheduler.',
+            createdAt: createdAt,
+            likeCount: 142,
+            commentCount: 1,
+            isLiked: 0,
+          ),
+        ]);
+        expect(await newDb.select(newDb.feedItems).get(), const [
+          v3.FeedItemsData(postId: 'p1'),
+        ]);
+        expect(await newDb.select(newDb.bookmarks).get(), const [
+          v3.BookmarksData(postId: 'p1', bookmarkedAt: bookmarkedAt),
+        ]);
+        expect(await newDb.select(newDb.comments).get(), const [
+          v3.CommentsData(
+            id: 'c1',
+            postId: 'p1',
+            authorId: 'u_grace',
+            content: 'Lovely work.',
+            createdAt: commentedAt,
+          ),
+        ]);
+        expect(await newDb.select(newDb.recentSearches).get(), isEmpty);
       },
     );
   });

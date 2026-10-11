@@ -8,6 +8,8 @@ import 'package:connect_hub/core/network/dto/comment_dto.dart';
 import 'package:connect_hub/core/network/dto/create_post_request_dto.dart';
 import 'package:connect_hub/core/network/dto/post_dto.dart';
 import 'package:connect_hub/core/network/dto/post_page_dto.dart';
+import 'package:connect_hub/core/network/dto/search_response_dto.dart';
+import 'package:connect_hub/core/network/dto/update_profile_request_dto.dart';
 import 'package:connect_hub/core/network/dto/user_dto.dart';
 import 'package:connect_hub/core/network/fake_server/seed_loader.dart';
 import 'package:injectable/injectable.dart';
@@ -15,7 +17,8 @@ import 'package:injectable/injectable.dart';
 /// An in-memory stand-in for ConnectHub's backend.
 ///
 /// It plays the role a REST server would: it owns the data and its rules
-/// (accounts, tokens, posts, likes, bookmarks, comments; later chats). The
+/// (accounts, tokens, profiles, posts, likes, bookmarks, comments and search;
+/// later chats). The
 /// rest of the app reaches it **only** through the `…ApiService` interfaces,
 /// so a real HTTP client could replace the fake services without changing
 /// any caller.
@@ -279,6 +282,105 @@ class FakeServer {
   }
 
   // ---------------------------------------------------------------------------
+  // Bookmarks
+
+  /// The posts [viewerId] has bookmarked, the most recently bookmarked first
+  /// (ties broken by id, like the feed).
+  Future<List<PostDto>> getBookmarks(String viewerId) async {
+    await _ready();
+    DateTime bookmarkedAt(_ServerPost post) => post.bookmarks[viewerId]!;
+    final bookmarked =
+        [
+          for (final post in _posts.values)
+            if (post.bookmarks.containsKey(viewerId)) post,
+        ]..sort((a, b) {
+          final byTime = bookmarkedAt(b).compareTo(bookmarkedAt(a));
+          return byTime != 0 ? byTime : b.id.compareTo(a.id);
+        });
+    return [for (final post in bookmarked) _postDto(post, viewerId)];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Users
+
+  /// Anyone's public profile. Throws [NotFoundException] for an unknown id.
+  Future<UserDto> getUser(String userId) async {
+    await _ready();
+    return _user(userId);
+  }
+
+  /// Every post by [userId], newest first, as [viewerId] sees them. Throws
+  /// [NotFoundException] for an unknown user.
+  Future<List<PostDto>> getUserPosts(String viewerId, String userId) async {
+    await _ready();
+    _user(userId);
+    return [
+      for (final post in _postsNewestFirst())
+        if (post.authorId == userId) _postDto(post, viewerId),
+    ];
+  }
+
+  /// Updates [viewerId]'s own profile and returns it.
+  ///
+  /// Posts and comments store their author's id, not a copy of the name, so
+  /// the new name and picture show on everything the user ever wrote. The
+  /// server checks the client's rules again and stores trimmed values; a
+  /// request that breaks them fails with a [FormatException] (400).
+  Future<UserDto> updateMe(
+    String viewerId,
+    UpdateProfileRequestDto request,
+  ) async {
+    await _ready();
+    final user = _user(viewerId);
+    final name = request.name.trim();
+    final bio = request.bio.trim();
+    final avatarUrl = request.avatarUrl?.trim() ?? '';
+    if (Validators.name(name) != null ||
+        Validators.bio(bio) != null ||
+        Validators.imageUrl(avatarUrl) != null) {
+      throw FormatException('Invalid profile', request.name);
+    }
+    _users[viewerId] = UserDto(
+      id: user.id,
+      name: name,
+      avatarUrl: avatarUrl.isEmpty ? null : avatarUrl,
+      bio: bio,
+      followersCount: user.followersCount,
+      followingCount: user.followingCount,
+    );
+    return _ownRecord(viewerId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Search
+
+  /// People and posts matching [query], case-insensitively ("contains"):
+  /// - people by name or bio, except the viewer, the most followed first;
+  /// - posts by content or author name, newest first.
+  ///
+  /// A blank query matches nothing.
+  Future<SearchResponseDto> search(String viewerId, String query) async {
+    await _ready();
+    final needle = query.trim().toLowerCase();
+    if (needle.isEmpty) return const SearchResponseDto(users: [], posts: []);
+    bool matches(String text) => text.toLowerCase().contains(needle);
+
+    final people = [
+      for (final user in _users.values)
+        if (user.id != viewerId && (matches(user.name) || matches(user.bio)))
+          user,
+    ]..sort(_mostFollowedFirst);
+    return SearchResponseDto(
+      users: people,
+      posts: [
+        for (final post in _postsNewestFirst())
+          if (matches(post.content) || matches(_users[post.authorId]!.name))
+            _postDto(post, viewerId),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
   // Seeding
 
   Future<void> _ready() => _seeding ??= _seed();
@@ -337,6 +439,9 @@ class FakeServer {
   _ServerPost _post(String postId) =>
       _posts[postId] ?? (throw const NotFoundException());
 
+  UserDto _user(String userId) =>
+      _users[userId] ?? (throw const NotFoundException());
+
   List<_ServerPost> _postsNewestFirst() =>
       _posts.values.toList()..sort(_ServerPost.newestFirst);
 
@@ -363,22 +468,39 @@ class FakeServer {
     createdAt: comment.createdAt,
   );
 
-  /// The signed-in user's own record is the only one that includes an email.
   AuthResponseDto _authResponse(String email) {
-    final account = _accounts[email]!;
-    final user = _users[account.userId]!;
+    final userId = _accounts[email]!.userId;
     return AuthResponseDto(
-      token: 'fake.${account.userId}.${_ids.hex(16)}',
-      user: UserDto(
-        id: user.id,
-        name: user.name,
-        email: email,
-        avatarUrl: user.avatarUrl,
-        bio: user.bio,
-        followersCount: user.followersCount,
-        followingCount: user.followingCount,
-      ),
+      token: 'fake.$userId.${_ids.hex(16)}',
+      user: _ownRecord(userId),
     );
+  }
+
+  /// The signed-in user's own record: the only one that includes an email.
+  UserDto _ownRecord(String userId) {
+    final user = _users[userId]!;
+    return UserDto(
+      id: user.id,
+      name: user.name,
+      email: _emailOf(userId),
+      avatarUrl: user.avatarUrl,
+      bio: user.bio,
+      followersCount: user.followersCount,
+      followingCount: user.followingCount,
+    );
+  }
+
+  String? _emailOf(String userId) {
+    for (final MapEntry(key: email, value: account) in _accounts.entries) {
+      if (account.userId == userId) return email;
+    }
+    return null;
+  }
+
+  /// Search's order for people: the most followed first, then by name.
+  static int _mostFollowedFirst(UserDto a, UserDto b) {
+    final byFollowers = b.followersCount.compareTo(a.followersCount);
+    return byFollowers != 0 ? byFollowers : a.name.compareTo(b.name);
   }
 
   /// [user] as anyone may see it: everything but the email.

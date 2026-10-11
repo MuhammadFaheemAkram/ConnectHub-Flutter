@@ -2,6 +2,7 @@ import 'package:connect_hub/core/database/app_database.dart';
 import 'package:connect_hub/core/network/fake_server/fake_server.dart';
 import 'package:connect_hub/core/network/fake_server/network_simulator.dart';
 import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/domain/repository/feed_repository.dart';
 import 'package:connect_hub/features/feed/cubit/feed_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -59,6 +60,22 @@ void main() {
 
     expect(find.text(FeedCubit.refreshFailedMessage), findsOneWidget);
     expect(firstPost, findsOneWidget);
+  });
+
+  testWidgets('regression: offline from launch, the saved feed shows and the '
+      'failed refresh says so, however fast it fails', (tester) async {
+    await pumpConnectHub(
+      tester,
+      signedIn: true,
+      // The cache from a previous launch; this one starts offline.
+      beforeLaunch: () async {
+        await getIt<FeedRepository>().refresh();
+        getIt<NetworkSimulator>().failRequests = true;
+      },
+    );
+
+    expect(firstPost, findsOneWidget);
+    expect(find.text(FeedCubit.refreshFailedMessage), findsOneWidget);
   });
 
   testWidgets('a token the server rejects ends the session: Login explains '

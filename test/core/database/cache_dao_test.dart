@@ -11,12 +11,13 @@ void main() {
 
   tearDown(() => database.close());
 
-  test('clearAll leaves every table empty', () async {
+  test('clearAll leaves every table empty, recent searches included', () async {
     await database.feedDao.replaceFeed([
       cachedPost('p1', bookmarkedAt: testNow),
       cachedPost('p2', authorId: 'u_grace'),
     ]);
     await database.commentsDao.addComment(cachedComment('c1'));
+    await database.searchDao.saveRecentSearch('ada', at: testNow);
 
     await database.cacheDao.clearAll();
 

@@ -176,4 +176,41 @@ void main() {
       expect(await database.select(database.bookmarks).get(), isEmpty);
     });
   });
+
+  group("an author's posts", () {
+    List<String> idsOf(List<CachedPost> posts) => [
+      for (final entry in posts) entry.post.id,
+    ];
+
+    test('watchPostsByAuthor lists only theirs, newest first', () async {
+      await dao.upsertPosts([
+        cachedPost('p1', minutesAgo: 30),
+        cachedPost('p2', minutesAgo: 10),
+        cachedPost('p3', authorId: 'u_grace'),
+      ]);
+
+      expect(idsOf(await dao.watchPostsByAuthor('u_ada').first), ['p2', 'p1']);
+    });
+
+    test('replacePostsByAuthor mirrors the server: posts it left out go, '
+        'with their comments, and nobody else\'s are touched', () async {
+      await dao.upsertPosts([
+        cachedPost('p1'),
+        cachedPost('p_gone'),
+        cachedPost('p3', authorId: 'u_grace'),
+      ]);
+      await database.commentsDao.addComment(
+        cachedComment('c1', postId: 'p_gone'),
+      );
+
+      await dao.replacePostsByAuthor('u_ada', [
+        cachedPost('p1', likeCount: 99),
+      ]);
+
+      expect(idsOf(await dao.watchPostsByAuthor('u_ada').first), ['p1']);
+      expect((await postRow('p1'))!.likeCount, 99);
+      expect(await postRow('p3'), isNotNull);
+      expect(await database.select(database.comments).get(), isEmpty);
+    });
+  });
 }

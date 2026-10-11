@@ -125,10 +125,11 @@ class FeedCubit extends Cubit<FeedState> {
         _refresh = _Refresh.failed;
         _refreshError = exception.message;
         // With posts on screen, they stay, and a SnackBar says why they may
-        // be stale (Correctness Rule 6: no silent errors).
-        if (_posts?.isNotEmpty ?? false) {
-          _message = _nextMessage(refreshFailedMessage);
-        }
+        // be stale (Correctness Rule 6: no silent errors). A fast failure
+        // can beat drift's first read, so check what is cached now.
+        _posts = await _watchFeed().firstValue;
+        if (isClosed) return;
+        if (_posts!.isNotEmpty) _message = _nextMessage(refreshFailedMessage);
     }
     _emitState();
   }

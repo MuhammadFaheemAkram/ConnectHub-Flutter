@@ -1708,6 +1708,296 @@ class CommentsCompanion extends UpdateCompanion<CommentRow> {
   }
 }
 
+class $RecentSearchesTable extends RecentSearches
+    with TableInfo<$RecentSearchesTable, RecentSearchRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $RecentSearchesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _normalizedQueryMeta = const VerificationMeta(
+    'normalizedQuery',
+  );
+  @override
+  late final GeneratedColumn<String> normalizedQuery = GeneratedColumn<String>(
+    'normalized_query',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _displayTextMeta = const VerificationMeta(
+    'displayText',
+  );
+  @override
+  late final GeneratedColumn<String> displayText = GeneratedColumn<String>(
+    'display_text',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _searchedAtMeta = const VerificationMeta(
+    'searchedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> searchedAt = GeneratedColumn<DateTime>(
+    'searched_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    normalizedQuery,
+    displayText,
+    searchedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'recent_searches';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<RecentSearchRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('normalized_query')) {
+      context.handle(
+        _normalizedQueryMeta,
+        normalizedQuery.isAcceptableOrUnknown(
+          data['normalized_query']!,
+          _normalizedQueryMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_normalizedQueryMeta);
+    }
+    if (data.containsKey('display_text')) {
+      context.handle(
+        _displayTextMeta,
+        displayText.isAcceptableOrUnknown(
+          data['display_text']!,
+          _displayTextMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_displayTextMeta);
+    }
+    if (data.containsKey('searched_at')) {
+      context.handle(
+        _searchedAtMeta,
+        searchedAt.isAcceptableOrUnknown(data['searched_at']!, _searchedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_searchedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {normalizedQuery};
+  @override
+  RecentSearchRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return RecentSearchRow(
+      normalizedQuery: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}normalized_query'],
+      )!,
+      displayText: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_text'],
+      )!,
+      searchedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}searched_at'],
+      )!,
+    );
+  }
+
+  @override
+  $RecentSearchesTable createAlias(String alias) {
+    return $RecentSearchesTable(attachedDatabase, alias);
+  }
+}
+
+class RecentSearchRow extends DataClass implements Insertable<RecentSearchRow> {
+  /// The trimmed, lower-case query: what makes two spellings one entry.
+  final String normalizedQuery;
+
+  /// The query as last searched (trimmed): what the list shows.
+  final String displayText;
+
+  /// UTC. The list shows the most recent first.
+  final DateTime searchedAt;
+  const RecentSearchRow({
+    required this.normalizedQuery,
+    required this.displayText,
+    required this.searchedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['normalized_query'] = Variable<String>(normalizedQuery);
+    map['display_text'] = Variable<String>(displayText);
+    map['searched_at'] = Variable<DateTime>(searchedAt);
+    return map;
+  }
+
+  RecentSearchesCompanion toCompanion(bool nullToAbsent) {
+    return RecentSearchesCompanion(
+      normalizedQuery: Value(normalizedQuery),
+      displayText: Value(displayText),
+      searchedAt: Value(searchedAt),
+    );
+  }
+
+  factory RecentSearchRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return RecentSearchRow(
+      normalizedQuery: serializer.fromJson<String>(json['normalizedQuery']),
+      displayText: serializer.fromJson<String>(json['displayText']),
+      searchedAt: serializer.fromJson<DateTime>(json['searchedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'normalizedQuery': serializer.toJson<String>(normalizedQuery),
+      'displayText': serializer.toJson<String>(displayText),
+      'searchedAt': serializer.toJson<DateTime>(searchedAt),
+    };
+  }
+
+  RecentSearchRow copyWith({
+    String? normalizedQuery,
+    String? displayText,
+    DateTime? searchedAt,
+  }) => RecentSearchRow(
+    normalizedQuery: normalizedQuery ?? this.normalizedQuery,
+    displayText: displayText ?? this.displayText,
+    searchedAt: searchedAt ?? this.searchedAt,
+  );
+  RecentSearchRow copyWithCompanion(RecentSearchesCompanion data) {
+    return RecentSearchRow(
+      normalizedQuery: data.normalizedQuery.present
+          ? data.normalizedQuery.value
+          : this.normalizedQuery,
+      displayText: data.displayText.present
+          ? data.displayText.value
+          : this.displayText,
+      searchedAt: data.searchedAt.present
+          ? data.searchedAt.value
+          : this.searchedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecentSearchRow(')
+          ..write('normalizedQuery: $normalizedQuery, ')
+          ..write('displayText: $displayText, ')
+          ..write('searchedAt: $searchedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(normalizedQuery, displayText, searchedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is RecentSearchRow &&
+          other.normalizedQuery == this.normalizedQuery &&
+          other.displayText == this.displayText &&
+          other.searchedAt == this.searchedAt);
+}
+
+class RecentSearchesCompanion extends UpdateCompanion<RecentSearchRow> {
+  final Value<String> normalizedQuery;
+  final Value<String> displayText;
+  final Value<DateTime> searchedAt;
+  final Value<int> rowid;
+  const RecentSearchesCompanion({
+    this.normalizedQuery = const Value.absent(),
+    this.displayText = const Value.absent(),
+    this.searchedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  RecentSearchesCompanion.insert({
+    required String normalizedQuery,
+    required String displayText,
+    required DateTime searchedAt,
+    this.rowid = const Value.absent(),
+  }) : normalizedQuery = Value(normalizedQuery),
+       displayText = Value(displayText),
+       searchedAt = Value(searchedAt);
+  static Insertable<RecentSearchRow> custom({
+    Expression<String>? normalizedQuery,
+    Expression<String>? displayText,
+    Expression<DateTime>? searchedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (normalizedQuery != null) 'normalized_query': normalizedQuery,
+      if (displayText != null) 'display_text': displayText,
+      if (searchedAt != null) 'searched_at': searchedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  RecentSearchesCompanion copyWith({
+    Value<String>? normalizedQuery,
+    Value<String>? displayText,
+    Value<DateTime>? searchedAt,
+    Value<int>? rowid,
+  }) {
+    return RecentSearchesCompanion(
+      normalizedQuery: normalizedQuery ?? this.normalizedQuery,
+      displayText: displayText ?? this.displayText,
+      searchedAt: searchedAt ?? this.searchedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (normalizedQuery.present) {
+      map['normalized_query'] = Variable<String>(normalizedQuery.value);
+    }
+    if (displayText.present) {
+      map['display_text'] = Variable<String>(displayText.value);
+    }
+    if (searchedAt.present) {
+      map['searched_at'] = Variable<DateTime>(searchedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('RecentSearchesCompanion(')
+          ..write('normalizedQuery: $normalizedQuery, ')
+          ..write('displayText: $displayText, ')
+          ..write('searchedAt: $searchedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1716,9 +2006,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $FeedItemsTable feedItems = $FeedItemsTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
   late final $CommentsTable comments = $CommentsTable(this);
+  late final $RecentSearchesTable recentSearches = $RecentSearchesTable(this);
   late final PostsDao postsDao = PostsDao(this as AppDatabase);
   late final FeedDao feedDao = FeedDao(this as AppDatabase);
   late final CommentsDao commentsDao = CommentsDao(this as AppDatabase);
+  late final UsersDao usersDao = UsersDao(this as AppDatabase);
+  late final BookmarksDao bookmarksDao = BookmarksDao(this as AppDatabase);
+  late final SearchDao searchDao = SearchDao(this as AppDatabase);
   late final CacheDao cacheDao = CacheDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -1730,6 +2024,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     feedItems,
     bookmarks,
     comments,
+    recentSearches,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3701,6 +3996,189 @@ typedef $$CommentsTableProcessedTableManager =
       CommentRow,
       PrefetchHooks Function({bool postId, bool authorId})
     >;
+typedef $$RecentSearchesTableCreateCompanionBuilder =
+    RecentSearchesCompanion Function({
+      required String normalizedQuery,
+      required String displayText,
+      required DateTime searchedAt,
+      Value<int> rowid,
+    });
+typedef $$RecentSearchesTableUpdateCompanionBuilder =
+    RecentSearchesCompanion Function({
+      Value<String> normalizedQuery,
+      Value<String> displayText,
+      Value<DateTime> searchedAt,
+      Value<int> rowid,
+    });
+
+class $$RecentSearchesTableFilterComposer
+    extends Composer<_$AppDatabase, $RecentSearchesTable> {
+  $$RecentSearchesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get normalizedQuery => $composableBuilder(
+    column: $table.normalizedQuery,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayText => $composableBuilder(
+    column: $table.displayText,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get searchedAt => $composableBuilder(
+    column: $table.searchedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$RecentSearchesTableOrderingComposer
+    extends Composer<_$AppDatabase, $RecentSearchesTable> {
+  $$RecentSearchesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get normalizedQuery => $composableBuilder(
+    column: $table.normalizedQuery,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayText => $composableBuilder(
+    column: $table.displayText,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get searchedAt => $composableBuilder(
+    column: $table.searchedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$RecentSearchesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $RecentSearchesTable> {
+  $$RecentSearchesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get normalizedQuery => $composableBuilder(
+    column: $table.normalizedQuery,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get displayText => $composableBuilder(
+    column: $table.displayText,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get searchedAt => $composableBuilder(
+    column: $table.searchedAt,
+    builder: (column) => column,
+  );
+}
+
+class $$RecentSearchesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $RecentSearchesTable,
+          RecentSearchRow,
+          $$RecentSearchesTableFilterComposer,
+          $$RecentSearchesTableOrderingComposer,
+          $$RecentSearchesTableAnnotationComposer,
+          $$RecentSearchesTableCreateCompanionBuilder,
+          $$RecentSearchesTableUpdateCompanionBuilder,
+          (
+            RecentSearchRow,
+            BaseReferences<
+              _$AppDatabase,
+              $RecentSearchesTable,
+              RecentSearchRow
+            >,
+          ),
+          RecentSearchRow,
+          PrefetchHooks Function()
+        > {
+  $$RecentSearchesTableTableManager(
+    _$AppDatabase db,
+    $RecentSearchesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$RecentSearchesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$RecentSearchesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$RecentSearchesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> normalizedQuery = const Value.absent(),
+                Value<String> displayText = const Value.absent(),
+                Value<DateTime> searchedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => RecentSearchesCompanion(
+                normalizedQuery: normalizedQuery,
+                displayText: displayText,
+                searchedAt: searchedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String normalizedQuery,
+                required String displayText,
+                required DateTime searchedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => RecentSearchesCompanion.insert(
+                normalizedQuery: normalizedQuery,
+                displayText: displayText,
+                searchedAt: searchedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$RecentSearchesTable, RecentSearchRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $RecentSearchesTable,
+                    RecentSearchRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$RecentSearchesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $RecentSearchesTable,
+      RecentSearchRow,
+      $$RecentSearchesTableFilterComposer,
+      $$RecentSearchesTableOrderingComposer,
+      $$RecentSearchesTableAnnotationComposer,
+      $$RecentSearchesTableCreateCompanionBuilder,
+      $$RecentSearchesTableUpdateCompanionBuilder,
+      (
+        RecentSearchRow,
+        BaseReferences<_$AppDatabase, $RecentSearchesTable, RecentSearchRow>,
+      ),
+      RecentSearchRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -3715,4 +4193,6 @@ class $AppDatabaseManager {
       $$BookmarksTableTableManager(_db, _db.bookmarks);
   $$CommentsTableTableManager get comments =>
       $$CommentsTableTableManager(_db, _db.comments);
+  $$RecentSearchesTableTableManager get recentSearches =>
+      $$RecentSearchesTableTableManager(_db, _db.recentSearches);
 }

@@ -4,9 +4,6 @@ import 'package:json_annotation/json_annotation.dart';
 part 'comment_dto.g.dart';
 
 /// A comment on a post, as the API (and the seed file) describes it.
-///
-/// In Phase 3 only the fake server reads comments, to derive each post's
-/// comment count. The comment endpoints arrive in Phase 4.
 @JsonSerializable(createToJson: false, checked: true)
 class CommentDto {
   const CommentDto({

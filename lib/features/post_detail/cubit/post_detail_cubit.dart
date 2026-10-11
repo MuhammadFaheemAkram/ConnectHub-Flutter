@@ -153,6 +153,11 @@ class PostDetailCubit extends Cubit<PostDetailState> {
       case Err(:final exception):
         _refresh = _Refresh.failed;
         _refreshError = exception.message;
+        // A fast failure can beat drift's first read: check what is cached
+        // now (as in the Feed).
+        _post = await _watchPost(postId).firstValue;
+        _postRead = true;
+        if (isClosed) return;
         if (_post != null) _message = _nextMessage(refreshFailedMessage);
     }
     _emitState();
