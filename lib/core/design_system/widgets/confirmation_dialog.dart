@@ -3,8 +3,8 @@ import 'package:material_ui/material_ui.dart';
 /// Asks the user to confirm an action, and completes with `true` only if
 /// they confirmed (dismissing the dialog counts as "no").
 ///
-/// One helper for every "Are you sure?" in the app: log out now; delete a
-/// comment, clear the cache and discard a draft later.
+/// One helper for every "Are you sure?" in the app: log out, delete a
+/// comment, clear the cache, discard a draft or an edit.
 Future<bool> showConfirmationDialog(
   BuildContext context, {
   required String title,

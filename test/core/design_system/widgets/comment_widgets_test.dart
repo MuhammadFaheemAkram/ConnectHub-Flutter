@@ -1,4 +1,5 @@
 import 'package:clock/clock.dart';
+import 'package:connect_hub/core/common/validators.dart';
 import 'package:connect_hub/core/design_system/design_system.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -39,7 +40,7 @@ void main() {
     });
   });
 
-  group('CommentComposer', () {
+  group('ComposerBar', () {
     late TextEditingController controller;
 
     setUp(() => controller = TextEditingController());
@@ -55,11 +56,7 @@ void main() {
     testWidgets('Send waits for non-blank text, then sends it', (tester) async {
       final sent = <String>[];
       await tester.pumpThemed(
-        CommentComposer(
-          controller: controller,
-          isSending: false,
-          onSend: sent.add,
-        ),
+        ComposerBar(controller: controller, onSend: sent.add),
       );
       expect(send(tester).onPressed, isNull);
 
@@ -79,16 +76,33 @@ void main() {
     ) async {
       controller.text = 'Nice!';
       await tester.pumpThemed(
-        CommentComposer(
-          controller: controller,
-          isSending: true,
-          onSend: (_) {},
-        ),
+        ComposerBar(controller: controller, isSending: true, onSend: (_) {}),
       );
 
       expect(find.bySemanticsLabel('Sending'), findsOneWidget);
       expect(send(tester).onPressed, isNull);
       expect(tester.widget<TextField>(find.byType(TextField)).readOnly, isTrue);
+    });
+
+    testWidgets('the field enforces its limit: 280 for a comment, 1000 for '
+        'a chat message', (tester) async {
+      await tester.pumpThemed(
+        ComposerBar(controller: controller, onSend: (_) {}),
+      );
+      await tester.enterText(find.byType(TextField), 'a' * 300);
+      expect(controller.text, hasLength(Validators.commentMaxLength));
+
+      await tester.pumpThemed(
+        ComposerBar(
+          controller: controller,
+          onSend: (_) {},
+          hintText: 'Message…',
+          maxLength: Validators.messageMaxLength,
+        ),
+      );
+      await tester.enterText(find.byType(TextField), 'a' * 1200);
+      expect(controller.text, hasLength(Validators.messageMaxLength));
+      expect(find.text('Message…'), findsOneWidget);
     });
   });
 

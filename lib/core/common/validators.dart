@@ -19,6 +19,7 @@ abstract final class Validators {
   static const postMaxLength = 280;
   static const commentMaxLength = 280;
   static const bioMaxLength = 160;
+  static const messageMaxLength = 1000;
 
   static String? email(String value) {
     final email = value.trim();

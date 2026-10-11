@@ -8,6 +8,7 @@ import 'package:connect_hub/domain/usecase/bookmark_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/like_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/load_more_feed_use_case.dart';
 import 'package:connect_hub/domain/usecase/refresh_feed_use_case.dart';
+import 'package:connect_hub/domain/usecase/watch_cache_cleared_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_feed_use_case.dart';
 import 'package:connect_hub/features/feed/cubit/feed_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -31,10 +32,14 @@ class FeedCubit extends Cubit<FeedState> {
     this._loadMoreFeed,
     this._likePost,
     this._bookmarkPost,
+    WatchCacheClearedUseCase watchCacheCleared,
   ) : super(const FeedState.loading()) {
     // Cached posts show the moment drift reads them, before the server
     // answers: offline-first.
     _subscription = _watchFeed().listen(_onPosts);
+    // "Clear cache" (Settings) emptied the feed while this tab stayed alive:
+    // load it again, rather than show "No posts yet".
+    _cacheCleared = watchCacheCleared().listen((_) => load());
   }
 
   final WatchFeedUseCase _watchFeed;
@@ -44,6 +49,7 @@ class FeedCubit extends Cubit<FeedState> {
   final BookmarkPostUseCase _bookmarkPost;
 
   late final StreamSubscription<List<Post>> _subscription;
+  late final StreamSubscription<void> _cacheCleared;
 
   static const refreshFailedMessage = "Couldn't refresh. Showing saved posts.";
   static const likeFailedMessage =
@@ -112,23 +118,25 @@ class FeedCubit extends Cubit<FeedState> {
     if (isClosed) return;
     switch (result) {
       case Ok(value: final hasMore):
-        _refresh = _Refresh.succeeded;
-        _hasMore = hasMore;
-        _loadMore = LoadMoreStatus.idle;
         // drift announces the new window asynchronously (conventions §11.3),
         // so `_posts` can still be the window from before the refresh. Read
         // the current one: an empty window that is about to fill up must
-        // never flash "No posts yet".
+        // never flash "No posts yet". The outcome is recorded only after
+        // the read, so a stale window that arrives meanwhile still counts
+        // as "loading" (§11.33).
         _posts = await _watchFeed().firstValue;
         if (isClosed) return;
+        _refresh = _Refresh.succeeded;
+        _hasMore = hasMore;
+        _loadMore = LoadMoreStatus.idle;
       case Err(:final exception):
-        _refresh = _Refresh.failed;
-        _refreshError = exception.message;
         // With posts on screen, they stay, and a SnackBar says why they may
         // be stale (Correctness Rule 6: no silent errors). A fast failure
         // can beat drift's first read, so check what is cached now.
         _posts = await _watchFeed().firstValue;
         if (isClosed) return;
+        _refresh = _Refresh.failed;
+        _refreshError = exception.message;
         if (_posts!.isNotEmpty) _message = _nextMessage(refreshFailedMessage);
     }
     _emitState();
@@ -170,6 +178,7 @@ class FeedCubit extends Cubit<FeedState> {
   @override
   Future<void> close() async {
     await _subscription.cancel();
+    await _cacheCleared.cancel();
     return super.close();
   }
 }

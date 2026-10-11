@@ -101,7 +101,7 @@ class _CommentsViewState extends State<CommentsView> {
               ),
               // Nothing to comment on when the comments couldn't load.
               if (state.status != CommentsStatus.failure)
-                CommentComposer(
+                ComposerBar(
                   controller: _comment,
                   isSending: state.isSending,
                   onSend: cubit.send,

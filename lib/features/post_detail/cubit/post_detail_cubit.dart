@@ -136,12 +136,12 @@ class PostDetailCubit extends Cubit<PostDetailState> {
     if (isClosed) return;
     switch (post) {
       case Ok():
-        _refresh = _Refresh.succeeded;
         // As in the Feed: decide on the post as cached *now*, not on the
         // stream's last value, which can predate the refresh.
         _post = await _watchPost(postId).firstValue;
         _postRead = true;
         if (isClosed) return;
+        _refresh = _Refresh.succeeded;
         if (comments is Err<void>) {
           _message = _nextMessage(commentsFailedMessage);
         }
@@ -151,13 +151,14 @@ class PostDetailCubit extends Cubit<PostDetailState> {
         _post = null;
         _postRead = true;
       case Err(:final exception):
-        _refresh = _Refresh.failed;
-        _refreshError = exception.message;
         // A fast failure can beat drift's first read: check what is cached
-        // now (as in the Feed).
+        // now (as in the Feed). Until then, the screen stays "loading": an
+        // error never shows before the first read (Correctness Rule 12).
         _post = await _watchPost(postId).firstValue;
         _postRead = true;
         if (isClosed) return;
+        _refresh = _Refresh.failed;
+        _refreshError = exception.message;
         if (_post != null) _message = _nextMessage(refreshFailedMessage);
     }
     _emitState();

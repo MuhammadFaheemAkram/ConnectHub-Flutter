@@ -7,6 +7,7 @@ import 'package:connect_hub/domain/usecase/clear_recent_searches_use_case.dart';
 import 'package:connect_hub/domain/usecase/like_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/save_recent_search_use_case.dart';
 import 'package:connect_hub/domain/usecase/search_use_case.dart';
+import 'package:connect_hub/domain/usecase/watch_cache_cleared_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_recent_searches_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_search_results_use_case.dart';
 import 'package:connect_hub/features/search/bloc/search_event.dart';
@@ -34,7 +35,8 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     this._saveRecentSearch,
     this._clearRecentSearches,
     this._likePost,
-    this._bookmarkPost, {
+    this._bookmarkPost,
+    this._watchCacheCleared, {
     @ignoreParam Duration debounce = const Duration(milliseconds: 300),
   }) : super(const SearchState()) {
     on<SearchSubscriptionRequested>(_onSubscriptionRequested);
@@ -44,6 +46,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     );
     on<SearchSubmitted>(_onSubmitted);
     on<SearchRetried>(_onRetried);
+    on<SearchCacheCleared>(_onCacheCleared);
     on<SearchScopeChanged>(_onScopeChanged);
     on<SearchResultOpened>(_onResultOpened);
     on<SearchRecentSearchesCleared>(_onRecentSearchesCleared);
@@ -58,6 +61,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   final ClearRecentSearchesUseCase _clearRecentSearches;
   final LikePostUseCase _likePost;
   final BookmarkPostUseCase _bookmarkPost;
+  final WatchCacheClearedUseCase _watchCacheCleared;
 
   static const likeFailedMessage =
       "Couldn't update the like. Please try again.";
@@ -69,14 +73,22 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   SearchHits? _shownHits;
   int _messageCount = 0;
 
+  /// Follows the recent searches, and "Clear cache" (Settings), for as long
+  /// as the screen lives.
   Future<void> _onSubscriptionRequested(
     SearchSubscriptionRequested event,
     Emitter<SearchState> emit,
-  ) {
-    return emit.forEach(
-      _watchRecentSearches(),
-      onData: (recent) => state.copyWith(recentSearches: recent),
-    );
+  ) async {
+    await (
+      emit.forEach(
+        _watchRecentSearches(),
+        onData: (recent) => state.copyWith(recentSearches: recent),
+      ),
+      emit.onEach(
+        _watchCacheCleared(),
+        onData: (_) => add(const SearchCacheCleared()),
+      ),
+    ).wait;
   }
 
   Future<void> _onQueryChanged(
@@ -149,6 +161,15 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   }
 
   void _onRetried(SearchRetried event, Emitter<SearchState> emit) {
+    if (state.query.isEmpty) return;
+    add(SearchQueryChanged(state.query, immediate: true));
+  }
+
+  /// The cache that held the results was cleared: ask the server again.
+  /// Forgetting the hits first makes it a real request, not a return to the
+  /// (now emptied) cached results.
+  void _onCacheCleared(SearchCacheCleared event, Emitter<SearchState> emit) {
+    _shownHits = null;
     if (state.query.isEmpty) return;
     add(SearchQueryChanged(state.query, immediate: true));
   }

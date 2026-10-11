@@ -222,8 +222,9 @@ void main() {
 
       await tester.tapAndSettle(find.byTooltip('Chats'));
       expect(appBarTitled('Chats'), findsOneWidget);
-      await tester.tapAndSettle(find.text('Open a sample chat'));
-      expect(appBarTitled('Chat'), findsOneWidget);
+      await tester.tapAndSettle(find.text('Grace Hopper'));
+      // A chat is titled with the other person's name.
+      expect(appBarTitled('Grace Hopper'), findsOneWidget);
 
       await tester.tapAndSettle(find.byType(BackButton));
       await tester.tapAndSettle(find.byType(BackButton));

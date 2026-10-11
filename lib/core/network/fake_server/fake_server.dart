@@ -1,31 +1,40 @@
+import 'dart:async';
+import 'dart:collection';
+
 import 'package:clock/clock.dart';
 import 'package:connect_hub/core/common/app_exception.dart';
 import 'package:connect_hub/core/common/demo_account.dart';
 import 'package:connect_hub/core/common/id_generator.dart';
 import 'package:connect_hub/core/common/validators.dart';
 import 'package:connect_hub/core/network/dto/auth_response_dto.dart';
+import 'package:connect_hub/core/network/dto/chat_event_dto.dart';
 import 'package:connect_hub/core/network/dto/comment_dto.dart';
+import 'package:connect_hub/core/network/dto/conversation_dto.dart';
 import 'package:connect_hub/core/network/dto/create_post_request_dto.dart';
+import 'package:connect_hub/core/network/dto/message_dto.dart';
+import 'package:connect_hub/core/network/dto/notification_dto.dart';
 import 'package:connect_hub/core/network/dto/post_dto.dart';
 import 'package:connect_hub/core/network/dto/post_page_dto.dart';
 import 'package:connect_hub/core/network/dto/search_response_dto.dart';
 import 'package:connect_hub/core/network/dto/update_profile_request_dto.dart';
 import 'package:connect_hub/core/network/dto/user_dto.dart';
+import 'package:connect_hub/core/network/fake_server/reply_scheduler.dart';
 import 'package:connect_hub/core/network/fake_server/seed_loader.dart';
 import 'package:injectable/injectable.dart';
 
 /// An in-memory stand-in for ConnectHub's backend.
 ///
 /// It plays the role a REST server would: it owns the data and its rules
-/// (accounts, tokens, profiles, posts, likes, bookmarks, comments and search;
-/// later chats). The
+/// (accounts, tokens, profiles, posts, likes, bookmarks, comments, search,
+/// chats and notifications). The
 /// rest of the app reaches it **only** through the `…ApiService` interfaces,
 /// so a real HTTP client could replace the fake services without changing
 /// any caller.
 ///
 /// It lives in memory and seeds itself from the bundled JSON on first use.
 /// Every launch therefore starts from the same seed: accounts created by sign
-/// up, posts, likes, bookmarks and comments last until the app restarts.
+/// up, posts, likes, bookmarks, comments, messages and read states last until
+/// the app restarts.
 /// That's deliberate, because the backend is not the point of this project;
 /// how the app talks to it is.
 ///
@@ -33,11 +42,12 @@ import 'package:injectable/injectable.dart';
 /// in the fake API layer, not here.
 @lazySingleton
 class FakeServer {
-  FakeServer(this._seeds, this._ids, this._clock);
+  FakeServer(this._seeds, this._ids, this._clock, this._replies);
 
   final SeedLoader _seeds;
   final IdGenerator _ids;
   final Clock _clock;
+  final ReplyScheduler _replies;
 
   Future<void>? _seeding;
 
@@ -53,6 +63,24 @@ class FakeServer {
 
   /// Every comment, in the order they were added.
   final _comments = <_ServerComment>[];
+
+  /// Conversations by id. Each belongs to one user's inbox ([_ServerConversation.ownerId]).
+  final _conversations = <String, _ServerConversation>{};
+
+  /// Every chat message, in the order the server received them.
+  final _messages = <_ServerMessage>[];
+  int _messageSeq = 0;
+
+  /// Every notification, each for one user.
+  final _notifications = <_ServerNotification>[];
+
+  /// The realtime channel's events, for every user; [chatEvents] picks one
+  /// user's.
+  final _chatEvents =
+      StreamController<({String ownerId, ChatEventDto event})>.broadcast();
+
+  /// Which canned reply comes next (see [cannedReplies]).
+  int _nextCannedReply = 0;
 
   /// Tokens revoked by "Expire session" (Settings → Developer).
   final _revokedTokens = <String>{};
@@ -381,6 +409,192 @@ class FakeServer {
   }
 
   // ---------------------------------------------------------------------------
+  // Chat
+
+  /// The other person's answer to a question.
+  static const questionReply = 'Good question — let me think about that. 🤔';
+
+  /// The answers to everything else, given in turn (the iOS edition's
+  /// replies), so a test knows which comes next.
+  static const cannedReplies = [
+    'Sounds good! 👍',
+    'Ha, totally agree.',
+    'Let me get back to you on that.',
+    'Nice — thanks for the update!',
+    'Interesting, tell me more.',
+    'On it. 🚀',
+    'That makes sense to me.',
+    'Great point!',
+  ];
+
+  /// [viewerId]'s conversations, the most recent activity first.
+  Future<List<ConversationDto>> getConversations(String viewerId) async {
+    await _ready();
+    final inbox =
+        [
+          for (final conversation in _conversations.values)
+            if (conversation.ownerId == viewerId) conversation,
+        ]..sort((a, b) {
+          final byTime = _updatedAt(b).compareTo(_updatedAt(a));
+          return byTime != 0 ? byTime : a.id.compareTo(b.id);
+        });
+    return [for (final conversation in inbox) _conversationDto(conversation)];
+  }
+
+  /// The messages in one of [viewerId]'s conversations, oldest first.
+  /// Anyone else's conversation answers [NotFoundException], like a missing
+  /// one.
+  Future<List<MessageDto>> getMessages(
+    String viewerId,
+    String conversationId,
+  ) async {
+    await _ready();
+    final conversation = _conversationOf(viewerId, conversationId);
+    return [
+      for (final message in _messagesIn(conversation.id)) _messageDto(message),
+    ];
+  }
+
+  /// Stores [text] as [viewerId]'s message, and schedules the reply.
+  ///
+  /// [clientId] is the id the client generated for the message. Sending the
+  /// same id again (a retry after a lost answer, say) returns the message
+  /// already stored, and schedules no second reply: a retry can't duplicate
+  /// anything. A blank message, or one over 1000 characters, is refused (a
+  /// 400, [FormatException]).
+  Future<MessageDto> sendMessage(
+    String viewerId,
+    String conversationId, {
+    required String clientId,
+    required String text,
+  }) async {
+    await _ready();
+    final conversation = _conversationOf(viewerId, conversationId);
+    if (_messageById(clientId) case final existing?) {
+      if (existing.senderId != viewerId) {
+        throw FormatException('Message id already taken', clientId);
+      }
+      return _messageDto(existing);
+    }
+    final body = text.trim();
+    if (body.isEmpty ||
+        Validators.lengthOf(body) > Validators.messageMaxLength) {
+      throw FormatException('Invalid message', text);
+    }
+    final message = _ServerMessage(
+      id: clientId,
+      conversationId: conversation.id,
+      senderId: viewerId,
+      text: body,
+      createdAt: _clock.now().toUtc(),
+      seq: _messageSeq++,
+    );
+    _messages.add(message);
+    _scheduleReply(conversation, answering: body);
+    return _messageDto(message);
+  }
+
+  /// Marks one of [viewerId]'s conversations read.
+  Future<void> markConversationRead(
+    String viewerId,
+    String conversationId,
+  ) async {
+    await _ready();
+    _conversationOf(viewerId, conversationId).unreadCount = 0;
+  }
+
+  /// The realtime channel: what happens in [viewerId]'s conversations, as it
+  /// happens.
+  Stream<ChatEventDto> chatEvents(String viewerId) => _chatEvents.stream
+      .where((owned) => owned.ownerId == viewerId)
+      .map((owned) => owned.event);
+
+  /// The other person types, then answers (see [ReplyScheduler]). A reply
+  /// raises the conversation's unread count; the client decides whether
+  /// that stays (a conversation on screen is read at once).
+  void _scheduleReply(
+    _ServerConversation conversation, {
+    required String answering,
+  }) {
+    final text = answering.contains('?')
+        ? questionReply
+        : cannedReplies[_nextCannedReply++ % cannedReplies.length];
+    void emit(ChatEventDto event) =>
+        _chatEvents.add((ownerId: conversation.ownerId, event: event));
+
+    _replies.schedule(
+      conversation.id,
+      onTypingStarted: () => emit(TypingStartedEvent(conversation.id)),
+      onReply: () {
+        final reply = _ServerMessage(
+          id: _ids.next('m'),
+          conversationId: conversation.id,
+          senderId: conversation.participantId,
+          text: text,
+          createdAt: _clock.now().toUtc(),
+          seq: _messageSeq++,
+        );
+        _messages.add(reply);
+        conversation.unreadCount++;
+        emit(
+          MessageReceivedEvent(
+            message: _messageDto(reply),
+            conversation: _conversationDto(conversation),
+          ),
+        );
+      },
+      onTypingStopped: () => emit(TypingStoppedEvent(conversation.id)),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Notifications
+
+  /// [viewerId]'s notifications, newest first, each with its read state.
+  Future<List<NotificationDto>> getNotifications(String viewerId) async {
+    await _ready();
+    final mine =
+        [
+          for (final notification in _notifications)
+            if (notification.ownerId == viewerId) notification,
+        ]..sort((a, b) {
+          final byTime = b.createdAt.compareTo(a.createdAt);
+          return byTime != 0 ? byTime : a.id.compareTo(b.id);
+        });
+    return [for (final notification in mine) notification.toDto()];
+  }
+
+  /// Marks one of [viewerId]'s notifications read. Idempotent; anyone
+  /// else's (or an unknown id) answers [NotFoundException].
+  Future<void> markNotificationRead(
+    String viewerId,
+    String notificationId,
+  ) async {
+    await _ready();
+    final notification = _notifications.firstWhere(
+      (notification) =>
+          notification.id == notificationId && notification.ownerId == viewerId,
+      orElse: () => throw const NotFoundException(),
+    );
+    notification.isRead = true;
+  }
+
+  Future<void> markAllNotificationsRead(String viewerId) async {
+    await _ready();
+    for (final notification in _notifications) {
+      if (notification.ownerId == viewerId) notification.isRead = true;
+    }
+  }
+
+  /// Stops every reply still to come and closes the realtime channel. The app
+  /// never calls it; `getIt.reset()` does, between tests.
+  @disposeMethod
+  void dispose() {
+    _replies.cancelAll();
+    unawaited(_chatEvents.close());
+  }
+
+  // ---------------------------------------------------------------------------
   // Seeding
 
   Future<void> _ready() => _seeding ??= _seed();
@@ -389,6 +603,9 @@ class FakeServer {
     final demo = await _seeds.loadAuthUser();
     final posts = await _seeds.loadPosts();
     final comments = await _seeds.loadComments();
+    final conversations = await _seeds.loadConversations();
+    final messages = await _seeds.loadMessages();
+    final notifications = await _seeds.loadNotifications();
 
     // The seed's dates are fixed (July 2026). Shift them all by the same
     // amount, so the newest record is a few minutes old whenever the app
@@ -397,6 +614,9 @@ class FakeServer {
     final newest = [
       for (final post in posts) post.createdAt,
       for (final comment in comments) comment.createdAt,
+      for (final conversation in conversations) conversation.updatedAt,
+      for (final message in messages) message.createdAt,
+      for (final notification in notifications) notification.createdAt,
     ].reduce((a, b) => a.isAfter(b) ? a : b);
     final launch = _clock.now().toUtc();
     final shift = launch.subtract(newestSeedAge).difference(newest);
@@ -431,6 +651,48 @@ class FakeServer {
         ),
       );
     }
+    // The seed's chats and notifications are the demo user's. A conversation's
+    // last message and time are derived from its messages, like comment
+    // counts; its unread count is the server's own state.
+    for (final conversation in conversations) {
+      final participant = conversation.participant;
+      _users.putIfAbsent(participant.id, () => _profile(participant));
+      _conversations[conversation.id] = _ServerConversation(
+        id: conversation.id,
+        ownerId: demo.id,
+        participantId: participant.id,
+        unreadCount: conversation.unreadCount,
+        startedAt: conversation.updatedAt.add(shift),
+      );
+    }
+    for (final message in messages) {
+      _messages.add(
+        _ServerMessage(
+          id: message.id,
+          conversationId: message.conversationId,
+          senderId: message.senderId == SeedLoader.demoSenderId
+              ? demo.id
+              : message.senderId,
+          text: message.text,
+          createdAt: message.createdAt.add(shift),
+          seq: _messageSeq++,
+        ),
+      );
+    }
+    for (final notification in notifications) {
+      _notifications.add(
+        _ServerNotification(
+          id: notification.id,
+          ownerId: demo.id,
+          kind: notification.kind,
+          text: notification.text,
+          createdAt: notification.createdAt.add(shift),
+          isRead: notification.isRead,
+          postId: notification.postId,
+          userId: notification.userId,
+        ),
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -441,6 +703,32 @@ class FakeServer {
 
   UserDto _user(String userId) =>
       _users[userId] ?? (throw const NotFoundException());
+
+  _ServerConversation _conversationOf(String viewerId, String conversationId) {
+    final conversation = _conversations[conversationId];
+    if (conversation == null || conversation.ownerId != viewerId) {
+      throw const NotFoundException();
+    }
+    return conversation;
+  }
+
+  _ServerMessage? _messageById(String messageId) {
+    for (final message in _messages) {
+      if (message.id == messageId) return message;
+    }
+    return null;
+  }
+
+  /// A conversation's messages, oldest first; the order received breaks
+  /// ties.
+  List<_ServerMessage> _messagesIn(String conversationId) => [
+    for (final message in _messages)
+      if (message.conversationId == conversationId) message,
+  ]..sort(_ServerMessage.oldestFirst);
+
+  DateTime _updatedAt(_ServerConversation conversation) =>
+      _messagesIn(conversation.id).lastOrNull?.createdAt ??
+      conversation.startedAt;
 
   List<_ServerPost> _postsNewestFirst() =>
       _posts.values.toList()..sort(_ServerPost.newestFirst);
@@ -458,6 +746,25 @@ class FakeServer {
     commentCount: _comments.where((c) => c.postId == post.id).length,
     isLiked: post.likedBy.contains(viewerId),
     bookmarkedAt: post.bookmarks[viewerId],
+  );
+
+  /// A conversation as its owner sees it: the last message and its time are
+  /// worked out from the messages, so they can never disagree.
+  ConversationDto _conversationDto(_ServerConversation conversation) =>
+      ConversationDto(
+        id: conversation.id,
+        participant: _users[conversation.participantId]!,
+        lastMessage: _messagesIn(conversation.id).lastOrNull?.text ?? '',
+        unreadCount: conversation.unreadCount,
+        updatedAt: _updatedAt(conversation),
+      );
+
+  MessageDto _messageDto(_ServerMessage message) => MessageDto(
+    id: message.id,
+    conversationId: message.conversationId,
+    senderId: message.senderId,
+    text: message.text,
+    createdAt: message.createdAt,
   );
 
   CommentDto _commentDto(_ServerComment comment) => CommentDto(
@@ -591,6 +898,85 @@ final class _ServerComment {
     final byTime = a.createdAt.compareTo(b.createdAt);
     return byTime != 0 ? byTime : a.id.compareTo(b.id);
   }
+}
+
+/// A conversation in one user's inbox ([ownerId]), with [participantId].
+final class _ServerConversation {
+  _ServerConversation({
+    required this.id,
+    required this.ownerId,
+    required this.participantId,
+    required this.unreadCount,
+    required this.startedAt,
+  });
+
+  final String id;
+  final String ownerId;
+  final String participantId;
+
+  /// Replies the owner hasn't read. Server-owned: a refresh never resets it.
+  int unreadCount;
+
+  /// When the conversation began: its time while it has no messages.
+  final DateTime startedAt;
+}
+
+final class _ServerMessage {
+  const _ServerMessage({
+    required this.id,
+    required this.conversationId,
+    required this.senderId,
+    required this.text,
+    required this.createdAt,
+    required this.seq,
+  });
+
+  final String id;
+  final String conversationId;
+  final String senderId;
+  final String text;
+  final DateTime createdAt;
+
+  /// The order the server received it in: breaks ties in time.
+  final int seq;
+
+  static int oldestFirst(_ServerMessage a, _ServerMessage b) {
+    final byTime = a.createdAt.compareTo(b.createdAt);
+    return byTime != 0 ? byTime : a.seq.compareTo(b.seq);
+  }
+}
+
+/// A notification for [ownerId]. Its read state is the server's.
+final class _ServerNotification {
+  _ServerNotification({
+    required this.id,
+    required this.ownerId,
+    required this.kind,
+    required this.text,
+    required this.createdAt,
+    required this.isRead,
+    required this.postId,
+    required this.userId,
+  });
+
+  final String id;
+  final String ownerId;
+  final NotificationKindDto kind;
+  final String text;
+  final DateTime createdAt;
+  bool isRead;
+  final String? postId;
+  final String? userId;
+
+  NotificationDto toDto() => NotificationDto(
+    id: id,
+    kind: kind,
+    text: text,
+    createdAt: createdAt,
+    isRead: isRead,
+    postId: postId,
+    userId: userId,
+  );
 }
 
 /// A position in the feed: "just after this post". Encoded as

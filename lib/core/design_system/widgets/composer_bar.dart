@@ -3,23 +3,30 @@ import 'package:connect_hub/core/design_system/theme/app_spacing.dart';
 import 'package:connect_hub/core/design_system/widgets/button_progress.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// The "Add a comment…" bar at the bottom of a screen.
+/// The text input bar at the bottom of a screen: "Add a comment…" under a
+/// post, "Message…" in a chat.
 ///
 /// The text lives in [controller], which the screen owns: it clears the
-/// field once a comment is sent, and leaves it alone when sending fails, so
+/// field once the text is sent, and leaves it alone when sending fails, so
 /// nothing typed is lost. Send stays disabled while the text is blank, and
 /// shows progress while [isSending].
-class CommentComposer extends StatelessWidget {
-  const CommentComposer({
+class ComposerBar extends StatelessWidget {
+  const ComposerBar({
     super.key,
     required this.controller,
-    required this.isSending,
     required this.onSend,
+    this.isSending = false,
+    this.hintText = 'Add a comment…',
+    this.maxLength = Validators.commentMaxLength,
   });
 
   final TextEditingController controller;
-  final bool isSending;
   final ValueChanged<String> onSend;
+  final bool isSending;
+  final String hintText;
+
+  /// Enforced by the field, quietly (no counter).
+  final int maxLength;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +50,7 @@ class CommentComposer extends StatelessWidget {
                   readOnly: isSending,
                   minLines: 1,
                   maxLines: 4,
-                  maxLength: Validators.commentMaxLength,
+                  maxLength: maxLength,
                   // The limit is enforced quietly; a counter would only
                   // crowd the bar.
                   buildCounter: (
@@ -54,10 +61,10 @@ class CommentComposer extends StatelessWidget {
                   }) => null,
                   keyboardType: TextInputType.multiline,
                   textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Add a comment…',
+                  decoration: InputDecoration(
+                    hintText: hintText,
                     isDense: true,
-                    border: OutlineInputBorder(
+                    border: const OutlineInputBorder(
                       borderRadius: BorderRadius.all(Radius.circular(24)),
                     ),
                   ),

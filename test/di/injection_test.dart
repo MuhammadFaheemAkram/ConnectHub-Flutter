@@ -1,16 +1,24 @@
 import 'package:connect_hub/di/injection.dart';
 import 'package:connect_hub/domain/repository/auth_repository.dart';
 import 'package:connect_hub/domain/repository/bookmark_repository.dart';
+import 'package:connect_hub/domain/repository/cache_repository.dart';
+import 'package:connect_hub/domain/repository/chat_repository.dart';
 import 'package:connect_hub/domain/repository/comment_repository.dart';
+import 'package:connect_hub/domain/repository/demo_tools_repository.dart';
 import 'package:connect_hub/domain/repository/feed_repository.dart';
+import 'package:connect_hub/domain/repository/notification_repository.dart';
 import 'package:connect_hub/domain/repository/post_repository.dart';
 import 'package:connect_hub/domain/repository/profile_repository.dart';
 import 'package:connect_hub/domain/repository/search_repository.dart';
 import 'package:connect_hub/domain/repository/session_repository.dart';
+import 'package:connect_hub/domain/repository/settings_repository.dart';
+import 'package:connect_hub/features/activity/cubit/activity_cubit.dart';
 import 'package:connect_hub/features/auth/bloc/auth_bloc.dart';
 import 'package:connect_hub/features/auth/login/bloc/login_bloc.dart';
 import 'package:connect_hub/features/auth/sign_up/bloc/sign_up_bloc.dart';
 import 'package:connect_hub/features/bookmarks/cubit/bookmarks_cubit.dart';
+import 'package:connect_hub/features/chat_detail/cubit/chat_detail_cubit.dart';
+import 'package:connect_hub/features/chats/cubit/chats_cubit.dart';
 import 'package:connect_hub/features/comments/cubit/comments_cubit.dart';
 import 'package:connect_hub/features/create_post/cubit/create_post_cubit.dart';
 import 'package:connect_hub/features/edit_profile/cubit/edit_profile_cubit.dart';
@@ -18,7 +26,11 @@ import 'package:connect_hub/features/feed/cubit/feed_cubit.dart';
 import 'package:connect_hub/features/post_detail/cubit/post_detail_cubit.dart';
 import 'package:connect_hub/features/profile/cubit/profile_cubit.dart';
 import 'package:connect_hub/features/search/bloc/search_bloc.dart';
+import 'package:connect_hub/features/settings/cubit/settings_cubit.dart';
+import 'package:connect_hub/features/settings/cubit/settings_tools_cubit.dart';
+import 'package:connect_hub/features/shell/cubit/badges_cubit.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../helpers/test_dependencies.dart';
 
@@ -44,6 +56,13 @@ void main() {
       expect(getIt<SearchRepository>(), isNotNull);
       expect(getIt<BookmarkRepository>(), isNotNull);
       expect(getIt<ProfileRepository>(), isNotNull);
+      expect(getIt<ChatRepository>(), isNotNull);
+      expect(getIt<NotificationRepository>(), isNotNull);
+      expect(getIt<SettingsRepository>(), isNotNull);
+      expect(getIt<CacheRepository>(), isNotNull);
+      expect(getIt<DemoToolsRepository>(), isNotNull);
+      // Resolved before runApp (`@preResolve`).
+      expect(getIt<PackageInfo>().version, '1.0.0');
       await getIt<AuthBloc>().close();
       await getIt<LoginBloc>().close();
       await getIt<SignUpBloc>().close();
@@ -51,6 +70,11 @@ void main() {
       await getIt<FeedCubit>().close();
       await getIt<CreatePostCubit>().close();
       await getIt<BookmarksCubit>().close();
+      await getIt<SettingsCubit>().close();
+      await getIt<SettingsToolsCubit>().close();
+      await getIt<BadgesCubit>().close();
+      await getIt<ActivityCubit>().close();
+      await getIt<ChatsCubit>().close();
       // Runtime parameters arrive through `@factoryParam`.
       final detail = getIt<PostDetailCubit>(param1: 'p1');
       expect(detail.postId, 'p1');
@@ -64,6 +88,9 @@ void main() {
       final editProfile = getIt<EditProfileCubit>(param1: 'u_demo');
       expect(editProfile.userId, 'u_demo');
       await editProfile.close();
+      final chat = getIt<ChatDetailCubit>(param1: 'c1');
+      expect(chat.conversationId, 'c1');
+      await chat.close();
     },
   );
 

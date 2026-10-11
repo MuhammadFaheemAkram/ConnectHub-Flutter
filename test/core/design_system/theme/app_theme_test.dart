@@ -74,6 +74,23 @@ void main() {
           greaterThanOrEqualTo(4.5),
         );
       });
+
+      // My bubble's text and time share the avatar pair above.
+      test("$name: their bubble's text and time meet AA (4.5:1)", () {
+        final bubble = scheme.surfaceContainerHighest;
+        expect(contrast(scheme.onSurface, bubble), greaterThanOrEqualTo(4.5));
+        expect(
+          contrast(scheme.onSurfaceVariant, bubble),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
+
+      test('$name: "Not sent" on the surface meets AA (4.5:1)', () {
+        expect(
+          contrast(scheme.error, scheme.surface),
+          greaterThanOrEqualTo(4.5),
+        );
+      });
     }
   });
 }

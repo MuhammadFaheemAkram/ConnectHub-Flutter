@@ -12,7 +12,7 @@ typedef StoredSession = ({String token, String userId, String email});
 ///
 /// A token is a credential, so it doesn't belong in `shared_preferences`
 /// (plain files any backup or rooted device can read). Preferences such as
-/// the theme go there instead (Phase 6).
+/// the theme go there instead (`SettingsLocalDataSource`).
 @lazySingleton
 class SessionStorage {
   const SessionStorage(this._secureStorage);

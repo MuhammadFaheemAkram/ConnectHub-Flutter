@@ -110,7 +110,7 @@ class _PostDetailViewState extends State<PostDetailView> {
                     ),
                   ),
                 ),
-                CommentComposer(
+                ComposerBar(
                   controller: _comment,
                   isSending: state.isSending,
                   onSend: cubit.sendComment,

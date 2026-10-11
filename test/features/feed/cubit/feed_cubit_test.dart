@@ -8,11 +8,13 @@ import 'package:connect_hub/domain/usecase/bookmark_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/like_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/load_more_feed_use_case.dart';
 import 'package:connect_hub/domain/usecase/refresh_feed_use_case.dart';
+import 'package:connect_hub/domain/usecase/watch_cache_cleared_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_feed_use_case.dart';
 import 'package:connect_hub/features/feed/cubit/feed_cubit.dart';
 import 'package:connect_hub/features/feed/cubit/feed_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../helpers/fakes/fake_cache_repository.dart';
 import '../../../helpers/fakes/fake_feed_repository.dart';
 import '../../../helpers/fakes/fake_post_repository.dart';
 import '../../../helpers/fixtures.dart';
@@ -20,13 +22,18 @@ import '../../../helpers/fixtures.dart';
 void main() {
   late FakeFeedRepository feed;
   late FakePostRepository posts;
+  late FakeCacheRepository cache;
 
   setUp(() {
     feed = FakeFeedRepository();
     posts = FakePostRepository();
+    cache = FakeCacheRepository();
   });
 
-  tearDown(() => feed.dispose());
+  tearDown(() async {
+    await feed.dispose();
+    await cache.dispose();
+  });
 
   FeedCubit buildCubit() => FeedCubit(
     WatchFeedUseCase(feed),
@@ -34,6 +41,7 @@ void main() {
     LoadMoreFeedUseCase(feed),
     LikePostUseCase(posts),
     BookmarkPostUseCase(posts),
+    WatchCacheClearedUseCase(cache),
   );
 
   final p1 = samplePost('p1');
@@ -269,4 +277,29 @@ void main() {
       ],
     );
   });
+
+  blocTest<FeedCubit, FeedState>(
+    'after "Clear cache", the feed loads again: a spinner, never "No posts '
+    'yet"',
+    setUp: () =>
+        feed = FakeFeedRepository(cached: [p1])..refreshedWindow = [p1],
+    build: buildCubit,
+    act: (cubit) async {
+      await cubit.load();
+      // The cache is wiped, and the screens hear it before drift reports
+      // the emptied window. The refresh that follows takes a moment.
+      feed.gate = Completer<void>();
+      await cache.clearCache();
+      feed.replaceWindow(const []);
+      await pumpEventQueue();
+      feed.gate!.complete();
+      await pumpEventQueue();
+    },
+    expect: () => [
+      FeedState.loaded(posts: [p1]),
+      const FeedState.loading(),
+      FeedState.loaded(posts: [p1]),
+    ],
+    verify: (_) => expect(feed.refreshCalls, 2),
+  );
 }

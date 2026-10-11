@@ -5,8 +5,8 @@ import 'package:material_ui/material_ui.dart';
 /// Full-screen empty state: an icon, a title, an optional message and an
 /// optional [action] (e.g. a button).
 ///
-/// Used for genuinely empty data ("No bookmarks yet") and, in Phase 1, as the
-/// placeholder for screens that later phases fill in.
+/// Used for genuinely empty data: "No bookmarks yet", "Say hello 👋", or no
+/// matches for a filter.
 class EmptyStateView extends StatelessWidget {
   const EmptyStateView({
     super.key,

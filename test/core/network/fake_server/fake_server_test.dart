@@ -1,16 +1,20 @@
+import 'package:async/async.dart';
 import 'package:clock/clock.dart';
 import 'package:connect_hub/core/common/app_exception.dart';
 import 'package:connect_hub/core/common/demo_account.dart';
 import 'package:connect_hub/core/network/asset_json_loader.dart';
+import 'package:connect_hub/core/network/dto/chat_event_dto.dart';
 import 'package:connect_hub/core/network/dto/create_post_request_dto.dart';
 import 'package:connect_hub/core/network/dto/post_dto.dart';
 import 'package:connect_hub/core/network/dto/update_profile_request_dto.dart';
 import 'package:connect_hub/core/network/fake_server/fake_server.dart';
 import 'package:connect_hub/core/network/fake_server/seed_loader.dart';
+import 'package:connect_hub/domain/model/app_notification.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../../helpers/backend.dart';
+import '../../../helpers/stream_helpers.dart';
 
 void main() {
   // The real bundled seed JSON, read through the test asset bundle.
@@ -19,6 +23,7 @@ void main() {
   late FakeServer server;
 
   setUp(() => server = newFakeServer());
+  tearDown(() => server.dispose());
 
   /// Every post, page by page, as [viewer] sees them.
   Future<List<PostDto>> allPosts({String viewer = 'u_demo'}) async {
@@ -60,17 +65,21 @@ void main() {
       DateTime createdAt(String id) =>
           posts.singleWhere((post) => post.id == id).createdAt;
 
-      // The newest seed record is comment c13 (July 24, 10:30). p1 was
-      // posted 2h15m before it, and p2 1h35m before p1.
+      // The newest seed record, across every file, is notification n1
+      // (July 24, 11:10). p1 was posted 2h55m before it, and p2 1h35m
+      // before p1.
       final newest = testNow.subtract(FakeServer.newestSeedAge);
       expect(
         createdAt('p1'),
-        newest.subtract(const Duration(hours: 2, minutes: 15)),
+        newest.subtract(const Duration(hours: 2, minutes: 55)),
       );
       expect(
         createdAt('p1').difference(createdAt('p2')),
         const Duration(hours: 1, minutes: 35),
       );
+      final notifications = await server.getNotifications('u_demo');
+      expect(notifications.first.id, 'n1');
+      expect(notifications.first.createdAt, newest);
     });
 
     test('comment counts are derived from the comments, not the seed\'s '
@@ -638,5 +647,245 @@ void main() {
         );
       },
     );
+  });
+
+  group('chat', () {
+    test("the demo user's conversations, the most recent activity first, "
+        'with their seeded unread counts', () async {
+      final conversations = await server.getConversations('u_demo');
+
+      expect(conversations.map((c) => c.id), ['c1', 'c2', 'c3']);
+      expect(conversations.map((c) => c.unreadCount), [2, 0, 1]);
+      expect(conversations.first.participant.name, 'Grace Hopper');
+      expect(
+        conversations.first.lastMessage,
+        'Approved with 12 comments, as tradition demands.',
+      );
+    });
+
+    test('a new account has no conversations', () async {
+      final account = await server.signUp(
+        name: 'Ada',
+        email: 'ada@example.com',
+        password: 'engines',
+      );
+
+      expect(await server.getConversations(account.user.id), isEmpty);
+    });
+
+    test("a conversation's messages run oldest first; the seed's \"me\" is "
+        'the demo user', () async {
+      final messages = await server.getMessages('u_demo', 'c1');
+
+      expect(messages.map((m) => m.id), ['m1', 'm2', 'm3', 'm4']);
+      expect(messages.map((m) => m.senderId), [
+        'u_grace',
+        'u_demo',
+        'u_grace',
+        'u_grace',
+      ]);
+    });
+
+    test(
+      "someone else's conversation, like an unknown one, answers 404",
+      () async {
+        expect(
+          server.getMessages('u_ada', 'c1'),
+          throwsA(isA<NotFoundException>()),
+        );
+        expect(
+          server.getMessages('u_demo', 'c404'),
+          throwsA(isA<NotFoundException>()),
+        );
+      },
+    );
+
+    test("a message keeps the client's id, and sending that id again "
+        'stores nothing new (an idempotent retry)', () async {
+      final first = await server.sendMessage(
+        'u_demo',
+        'c2',
+        clientId: 'm_client',
+        text: '  Hello  ',
+      );
+      final again = await server.sendMessage(
+        'u_demo',
+        'c2',
+        clientId: 'm_client',
+        text: 'Hello',
+      );
+
+      expect(first.id, 'm_client');
+      expect(first.text, 'Hello');
+      expect(again.createdAt, first.createdAt);
+      final ids = (await server.getMessages('u_demo', 'c2')).map((m) => m.id);
+      expect(ids.where((id) => id == 'm_client'), hasLength(1));
+      expect(ids.last, 'm_client');
+    });
+
+    test("a blank message, or an id that is someone else's message, is "
+        'refused', () async {
+      expect(
+        server.sendMessage('u_demo', 'c2', clientId: 'm_a', text: '   '),
+        throwsA(isA<FormatException>()),
+      );
+      // m1 is Grace's.
+      expect(
+        server.sendMessage('u_demo', 'c1', clientId: 'm1', text: 'Hi'),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('marking a conversation read zeroes its unread count', () async {
+      await server.markConversationRead('u_demo', 'c1');
+
+      final c1 = (await server.getConversations('u_demo'))
+          .firstWhere((c) => c.id == 'c1');
+      expect(c1.unreadCount, 0);
+    });
+
+    group('replies', () {
+      // Replies in real time, within a millisecond. (The scheduler's own
+      // timing is tested in fake time: `reply_scheduler_test.dart`.)
+      setUp(() {
+        server.dispose();
+        server = newFakeServer(replies: quickReplies());
+      });
+
+      test('the other person types, then answers: the reply raises the '
+          'unread count and arrives on the realtime channel', () async {
+        final events = StreamQueue(server.chatEvents('u_demo'));
+        addTearDown(events.cancel);
+
+        await server.sendMessage('u_demo', 'c2', clientId: 'm_a', text: 'Hi');
+
+        expect(await nextEvent(events), isA<TypingStartedEvent>());
+        final reply = await nextEvent(events) as MessageReceivedEvent;
+        expect(reply.message.text, FakeServer.cannedReplies.first);
+        expect(reply.message.senderId, 'u_alan');
+        expect(reply.conversation.unreadCount, 1);
+        expect(reply.conversation.lastMessage, reply.message.text);
+        expect(await nextEvent(events), isA<TypingStoppedEvent>());
+        final c2 = (await server.getConversations('u_demo')).first;
+        expect(c2.id, 'c2', reason: 'the latest activity comes first');
+      });
+
+      test('a question gets the question reply; anything else gets the '
+          'canned replies in turn', () async {
+        final events = StreamQueue(
+          server.chatEvents('u_demo').where((e) => e is MessageReceivedEvent),
+        );
+        addTearDown(events.cancel);
+        final replies = <String>[];
+
+        for (final (id, text) in [
+          ('m_a', 'Ready?'),
+          ('m_b', 'Ok'),
+          ('m_c', 'Sure'),
+        ]) {
+          await server.sendMessage('u_demo', 'c2', clientId: id, text: text);
+          final reply = await nextEvent(events) as MessageReceivedEvent;
+          replies.add(reply.message.text);
+        }
+
+        expect(replies, [
+          FakeServer.questionReply,
+          FakeServer.cannedReplies[0],
+          FakeServer.cannedReplies[1],
+        ]);
+      });
+
+      test('a retried message gets no second reply', () async {
+        final stopped = StreamQueue(
+          server.chatEvents('u_demo').where((e) => e is TypingStoppedEvent),
+        );
+        addTearDown(stopped.cancel);
+
+        await server.sendMessage('u_demo', 'c2', clientId: 'm_a', text: 'Hi');
+        await server.sendMessage('u_demo', 'c2', clientId: 'm_a', text: 'Hi');
+        // Typing stops after the last reply on its way.
+        await nextEvent(stopped);
+
+        // The seed's 3, mine, and one reply.
+        expect(await server.getMessages('u_demo', 'c2'), hasLength(5));
+      });
+
+      test("the channel carries only the viewer's own conversations", () async {
+        final someoneElses = <ChatEventDto>[];
+        final subscription = server
+            .chatEvents('u_ada')
+            .listen(someoneElses.add);
+        addTearDown(subscription.cancel);
+        final stopped = StreamQueue(
+          server.chatEvents('u_demo').where((e) => e is TypingStoppedEvent),
+        );
+        addTearDown(stopped.cancel);
+
+        await server.sendMessage('u_demo', 'c2', clientId: 'm_a', text: 'Hi');
+        await nextEvent(stopped);
+
+        expect(someoneElses, isEmpty);
+      });
+    });
+  });
+
+  group('notifications', () {
+    test('newest first, with their read state and links', () async {
+      final notifications = await server.getNotifications('u_demo');
+
+      expect(notifications.map((n) => n.id), [
+        'n1',
+        'n2',
+        'n3',
+        'n4',
+        'n5',
+        'n6',
+        'n7',
+        'n8',
+      ]);
+      expect(notifications.where((n) => !n.isRead).map((n) => n.id), [
+        'n1',
+        'n2',
+        'n3',
+      ]);
+      expect(notifications[0].postId, 'p16');
+      expect(notifications[2].userId, 'u_katherine');
+      expect(notifications[5].postId, isNull);
+      expect(notifications[5].userId, isNull);
+      expect(notifications.first.kind.name, NotificationKind.like.name);
+    });
+
+    test(
+      'the read state belongs to the server: marking one read sticks',
+      () async {
+        await server.markNotificationRead('u_demo', 'n1');
+        // Idempotent.
+        await server.markNotificationRead('u_demo', 'n1');
+
+        final n1 = (await server.getNotifications('u_demo')).first;
+        expect(n1.isRead, isTrue);
+      },
+    );
+
+    test(
+      "someone else's notification, like an unknown one, answers 404",
+      () async {
+        expect(
+          server.markNotificationRead('u_ada', 'n1'),
+          throwsA(isA<NotFoundException>()),
+        );
+        expect(
+          server.markNotificationRead('u_demo', 'n404'),
+          throwsA(isA<NotFoundException>()),
+        );
+      },
+    );
+
+    test('mark all read', () async {
+      await server.markAllNotificationsRead('u_demo');
+
+      final notifications = await server.getNotifications('u_demo');
+      expect(notifications.every((n) => n.isRead), isTrue);
+    });
   });
 }

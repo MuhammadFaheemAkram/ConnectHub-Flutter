@@ -102,19 +102,19 @@ class BookmarksCubit extends Cubit<BookmarksState> {
     if (isClosed) return;
     switch (result) {
       case Ok():
-        _refresh = _Refresh.succeeded;
         // As in the Feed: decide on the list as cached *now*, not on the
         // stream's last value, which can predate the refresh.
         _posts = await _watchBookmarks().firstValue;
         if (isClosed) return;
+        _refresh = _Refresh.succeeded;
       case Err(:final exception):
-        _refresh = _Refresh.failed;
-        _refreshError = exception.message;
         // A fast failure can beat drift's first read, so check what is
         // cached now too: saved bookmarks stay, and the screen says why they
         // may be stale (Correctness Rule 6).
         _posts = await _watchBookmarks().firstValue;
         if (isClosed) return;
+        _refresh = _Refresh.failed;
+        _refreshError = exception.message;
         if (_posts!.isNotEmpty) _message = _nextMessage(refreshFailedMessage);
     }
     _emitState();

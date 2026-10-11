@@ -10,6 +10,7 @@ import 'package:connect_hub/domain/usecase/clear_recent_searches_use_case.dart';
 import 'package:connect_hub/domain/usecase/like_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/save_recent_search_use_case.dart';
 import 'package:connect_hub/domain/usecase/search_use_case.dart';
+import 'package:connect_hub/domain/usecase/watch_cache_cleared_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_recent_searches_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_search_results_use_case.dart';
 import 'package:connect_hub/features/search/bloc/search_bloc.dart';
@@ -18,6 +19,7 @@ import 'package:connect_hub/features/search/bloc/search_state.dart';
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../helpers/fakes/fake_cache_repository.dart';
 import '../../../helpers/fakes/fake_post_repository.dart';
 import '../../../helpers/fakes/fake_search_repository.dart';
 import '../../../helpers/fixtures.dart';
@@ -25,6 +27,7 @@ import '../../../helpers/fixtures.dart';
 void main() {
   late FakeSearchRepository search;
   late FakePostRepository posts;
+  late FakeCacheRepository cache;
 
   const katherine = User(id: 'u_katherine', name: 'Katherine Johnson');
   final p1 = samplePost('p1');
@@ -42,11 +45,13 @@ void main() {
       ..answers['ada'] = adaResults
       ..answers['moon'] = const SearchResults(users: [katherine]);
     posts = FakePostRepository();
+    cache = FakeCacheRepository();
   });
 
   tearDown(() async {
     await search.dispose();
     await posts.dispose();
+    await cache.dispose();
   });
 
   SearchBloc buildBloc({Duration debounce = shortDebounce}) => SearchBloc(
@@ -57,6 +62,7 @@ void main() {
     ClearRecentSearchesUseCase(search),
     LikePostUseCase(posts),
     BookmarkPostUseCase(posts),
+    WatchCacheClearedUseCase(cache),
     debounce: debounce,
   );
 
@@ -288,6 +294,33 @@ void main() {
       await pumpEventQueue();
       expect(search.clearCalls, 1);
       expect(bloc.state.recentSearches, isEmpty);
+    });
+  });
+
+  group('"Clear cache" (Settings)', () {
+    test('the search on screen runs again: its cached results were '
+        'deleted', () async {
+      final bloc = started()..add(const SearchSubscriptionRequested());
+      await type(bloc, 'ada');
+      expect(search.searchCalls, ['ada']);
+
+      await cache.clearCache();
+      await settle();
+
+      expect(search.searchCalls, ['ada', 'ada']);
+      expect(bloc.state.status, SearchStatus.success);
+      expect(bloc.state.results, adaResults);
+    });
+
+    test('with nothing searched, nothing is requested', () async {
+      final bloc = started()..add(const SearchSubscriptionRequested());
+      await settle();
+
+      await cache.clearCache();
+      await settle();
+
+      expect(search.searchCalls, isEmpty);
+      expect(bloc.state.status, SearchStatus.idle);
     });
   });
 }

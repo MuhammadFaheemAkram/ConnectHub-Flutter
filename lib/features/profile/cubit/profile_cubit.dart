@@ -10,6 +10,7 @@ import 'package:connect_hub/domain/usecase/bookmark_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/like_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/refresh_user_posts_use_case.dart';
 import 'package:connect_hub/domain/usecase/refresh_user_use_case.dart';
+import 'package:connect_hub/domain/usecase/watch_cache_cleared_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_user_posts_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_user_use_case.dart';
 import 'package:connect_hub/features/profile/cubit/profile_state.dart';
@@ -37,8 +38,12 @@ class ProfileCubit extends Cubit<ProfileState> {
     this._refreshUserPosts,
     this._likePost,
     this._bookmarkPost,
+    WatchCacheClearedUseCase watchCacheCleared,
   ) : super(const ProfileState.loading()) {
     _subscription = _cache().listen(_onCache);
+    // "Clear cache" (Settings) deleted the cached posts while the Profile
+    // tab stayed alive: load them again, rather than show "No posts yet".
+    _cacheCleared = watchCacheCleared().listen((_) => _reloadAfterClear());
   }
 
   final String userId;
@@ -50,6 +55,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   final BookmarkPostUseCase _bookmarkPost;
 
   late final StreamSubscription<_Cached> _subscription;
+  late final StreamSubscription<void> _cacheCleared;
 
   static const refreshFailedMessage =
       "Couldn't refresh. Showing the saved profile.";
@@ -84,6 +90,13 @@ class ProfileCubit extends Cubit<ProfileState> {
   /// Pull to refresh: the profile stays on screen while it runs.
   Future<void> refresh() => _runRefresh();
 
+  /// Like [load], but the posts count as not fetched again, so the emptied
+  /// list shows its spinner instead of "No posts yet".
+  Future<void> _reloadAfterClear() {
+    _postsFetched = false;
+    return load();
+  }
+
   Future<void> toggleLike(Post post) async {
     final result = await _likePost(post.id, liked: !post.isLiked);
     if (result is Err<void>) _show(likeFailedMessage);
@@ -103,21 +116,21 @@ class ProfileCubit extends Cubit<ProfileState> {
     if (isClosed) return;
     switch (user) {
       case Ok():
-        _refresh = _Refresh.succeeded;
         // Decide on what is cached *now*: drift reports the refresh's writes
-        // a moment later (conventions §11.3).
+        // a moment later (conventions §11.3). Then record the outcome.
         _read(await _cache().firstValue);
         if (isClosed) return;
+        _refresh = _Refresh.succeeded;
         if (posts is Err<void>) _message = _nextMessage(postsFailedMessage);
       case Err(exception: NotFoundException()):
         _refresh = _Refresh.notFound;
       case Err(:final exception):
-        _refresh = _Refresh.failed;
-        _refreshError = exception.message;
         // A fast failure can beat drift's first read: check what is cached
         // now, so a saved profile stays and the screen says why.
         _read(await _cache().firstValue);
         if (isClosed) return;
+        _refresh = _Refresh.failed;
+        _refreshError = exception.message;
         if (_user != null) _message = _nextMessage(refreshFailedMessage);
     }
     // Only now, with the fetched posts read: an empty list earlier would
@@ -178,6 +191,7 @@ class ProfileCubit extends Cubit<ProfileState> {
   @override
   Future<void> close() async {
     await _subscription.cancel();
+    await _cacheCleared.cancel();
     return super.close();
   }
 }

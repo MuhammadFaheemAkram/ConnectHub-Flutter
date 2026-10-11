@@ -106,19 +106,20 @@ class CommentsCubit extends Cubit<CommentsState> {
     if (isClosed) return;
     switch (result) {
       case Ok():
-        _refresh = _Refresh.succeeded;
+        // As in the Feed: read what is cached now, then record the outcome.
         _comments = await _watchComments(postId).firstValue;
         if (isClosed) return;
+        _refresh = _Refresh.succeeded;
       case Err(exception: NotFoundException()):
         _refresh = _Refresh.failed;
         _refreshError = notFoundMessage;
       case Err(:final exception):
-        _refresh = _Refresh.failed;
-        _refreshError = exception.message;
         // A fast failure can beat drift's first read: check what is cached
         // now (as in the Feed).
         _comments = await _watchComments(postId).firstValue;
         if (isClosed) return;
+        _refresh = _Refresh.failed;
+        _refreshError = exception.message;
         if (_comments!.isNotEmpty) {
           _message = _nextMessage(refreshFailedMessage);
         }

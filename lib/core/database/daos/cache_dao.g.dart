@@ -12,6 +12,9 @@ mixin _$CacheDaoMixin on DatabaseAccessor<AppDatabase> {
   $FeedItemsTable get feedItems => attachedDatabase.feedItems;
   $BookmarksTable get bookmarks => attachedDatabase.bookmarks;
   $RecentSearchesTable get recentSearches => attachedDatabase.recentSearches;
+  $ConversationsTable get conversations => attachedDatabase.conversations;
+  $MessagesTable get messages => attachedDatabase.messages;
+  $NotificationsTable get notifications => attachedDatabase.notifications;
   CacheDaoManager get managers => CacheDaoManager(this);
 }
 
@@ -33,4 +36,10 @@ class CacheDaoManager {
         _db.attachedDatabase,
         _db.recentSearches,
       );
+  $$ConversationsTableTableManager get conversations =>
+      $$ConversationsTableTableManager(_db.attachedDatabase, _db.conversations);
+  $$MessagesTableTableManager get messages =>
+      $$MessagesTableTableManager(_db.attachedDatabase, _db.messages);
+  $$NotificationsTableTableManager get notifications =>
+      $$NotificationsTableTableManager(_db.attachedDatabase, _db.notifications);
 }

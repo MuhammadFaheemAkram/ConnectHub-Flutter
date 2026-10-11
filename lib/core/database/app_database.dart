@@ -1,14 +1,19 @@
 import 'package:connect_hub/core/database/app_database.steps.dart';
 import 'package:connect_hub/core/database/daos/bookmarks_dao.dart';
 import 'package:connect_hub/core/database/daos/cache_dao.dart';
+import 'package:connect_hub/core/database/daos/chat_dao.dart';
 import 'package:connect_hub/core/database/daos/comments_dao.dart';
 import 'package:connect_hub/core/database/daos/feed_dao.dart';
+import 'package:connect_hub/core/database/daos/notifications_dao.dart';
 import 'package:connect_hub/core/database/daos/posts_dao.dart';
 import 'package:connect_hub/core/database/daos/search_dao.dart';
 import 'package:connect_hub/core/database/daos/users_dao.dart';
 import 'package:connect_hub/core/database/tables/bookmarks_table.dart';
 import 'package:connect_hub/core/database/tables/comments_table.dart';
+import 'package:connect_hub/core/database/tables/conversations_table.dart';
 import 'package:connect_hub/core/database/tables/feed_items_table.dart';
+import 'package:connect_hub/core/database/tables/messages_table.dart';
+import 'package:connect_hub/core/database/tables/notifications_table.dart';
 import 'package:connect_hub/core/database/tables/posts_table.dart';
 import 'package:connect_hub/core/database/tables/recent_searches_table.dart';
 import 'package:connect_hub/core/database/tables/users_table.dart';
@@ -27,7 +32,17 @@ part 'app_database.g.dart';
 /// the JSON packages: drift exports `Table`, `Column` and `JsonKey`, and
 /// those names would clash (conventions §11.1).
 @DriftDatabase(
-  tables: [Users, Posts, FeedItems, Bookmarks, Comments, RecentSearches],
+  tables: [
+    Users,
+    Posts,
+    FeedItems,
+    Bookmarks,
+    Comments,
+    RecentSearches,
+    Conversations,
+    Messages,
+    Notifications,
+  ],
   daos: [
     PostsDao,
     FeedDao,
@@ -35,6 +50,8 @@ part 'app_database.g.dart';
     UsersDao,
     BookmarksDao,
     SearchDao,
+    ChatDao,
+    NotificationsDao,
     CacheDao,
   ],
 )
@@ -51,8 +68,9 @@ class AppDatabase extends _$AppDatabase {
   /// 1. Phase 3: users, posts, feed_items, bookmarks.
   /// 2. Phase 4: comments.
   /// 3. Phase 5: recent_searches.
+  /// 4. Phase 6: conversations, messages, notifications.
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -67,6 +85,11 @@ class AppDatabase extends _$AppDatabase {
       },
       from2To3: (m, schema) async {
         await m.createTable(schema.recentSearches);
+      },
+      from3To4: (m, schema) async {
+        await m.createTable(schema.conversations);
+        await m.createTable(schema.messages);
+        await m.createTable(schema.notifications);
       },
     ),
     // SQLite ships with foreign keys *off*, per connection. Without this

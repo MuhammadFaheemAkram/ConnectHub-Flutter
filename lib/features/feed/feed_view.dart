@@ -17,6 +17,7 @@ class FeedView extends StatelessWidget {
     required this.onOpenProfile,
     required this.onOpenChats,
     required this.onCreatePost,
+    this.unreadChats = 0,
   });
 
   /// Called with the post's id.
@@ -31,6 +32,9 @@ class FeedView extends StatelessWidget {
   final VoidCallback onOpenChats;
   final VoidCallback onCreatePost;
 
+  /// The Chats button's badge; 0 hides it.
+  final int unreadChats;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -39,7 +43,10 @@ class FeedView extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Chats',
-            icon: const Icon(Icons.chat_bubble_outline),
+            icon: UnreadBadge(
+              count: unreadChats,
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
             onPressed: onOpenChats,
           ),
         ],

@@ -34,6 +34,11 @@ final class SearchRetried extends SearchEvent {
   const SearchRetried();
 }
 
+/// "Clear cache" (Settings) deleted the cached results: search again.
+final class SearchCacheCleared extends SearchEvent {
+  const SearchCacheCleared();
+}
+
 /// A chip: All, People or Posts.
 final class SearchScopeChanged extends SearchEvent {
   const SearchScopeChanged(this.scope);

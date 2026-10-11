@@ -81,7 +81,7 @@ void main() {
   testWidgets('a token the server rejects ends the session: Login explains '
       'why, and the cache is wiped', (tester) async {
     await pumpConnectHub(tester, signedIn: true);
-    // What "Expire session" (Settings → Developer, Phase 6) will do.
+    // What Settings → Developer → "Expire session" does.
     getIt<FakeServer>().revoke(demoSession.token);
 
     await pullToRefresh(tester);

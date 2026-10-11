@@ -34,7 +34,11 @@ void main() {
     when(() => cubit.toggleBookmark(any())).thenAnswer((_) async {});
   });
 
-  Future<void> pumpView(WidgetTester tester, FeedState state) async {
+  Future<void> pumpView(
+    WidgetTester tester,
+    FeedState state, {
+    int unreadChats = 0,
+  }) async {
     when(() => cubit.state).thenReturn(state);
     tester.usePhoneSurface();
     await tester.pumpWidget(
@@ -48,6 +52,7 @@ void main() {
             onOpenProfile: (id) => opened.add('profile:$id'),
             onOpenChats: () => opened.add('chats'),
             onCreatePost: () => opened.add('compose'),
+            unreadChats: unreadChats,
           ),
         ),
       ),
@@ -201,5 +206,26 @@ void main() {
       expect(find.text("You're all caught up"), findsOneWidget);
       verifyNever(() => cubit.loadMore());
     });
+  });
+
+  testWidgets('the Chats button shows the unread messages, read as "3 '
+      'unread"; none, no badge', (tester) async {
+    await pumpView(tester, loaded([p1]), unreadChats: 3);
+
+    final chats = find.byTooltip('Chats');
+    expect(
+      find.descendant(of: chats, matching: find.text('3')),
+      findsOneWidget,
+    );
+    expect(
+      tester.getSemantics(chats),
+      isSemantics(tooltip: 'Chats', value: '3 unread'),
+    );
+
+    await pumpView(tester, loaded([p1]));
+    expect(
+      find.descendant(of: chats, matching: find.byType(Text)),
+      findsNothing,
+    );
   });
 }

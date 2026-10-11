@@ -1,8 +1,13 @@
-import 'package:connect_hub/core/design_system/design_system.dart';
-import 'package:connect_hub/core/navigation/back_to_feed_button.dart';
+import 'package:connect_hub/core/navigation/app_routes.dart';
+import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/features/chat_detail/chat_detail_view.dart';
+import 'package:connect_hub/features/chat_detail/cubit/chat_detail_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Placeholder for a chat (the real screen arrives in Phase 6).
+/// A chat's entry point: creates its [ChatDetailCubit] (the conversation id
+/// is a factory parameter) and opens the participant's profile from the
+/// title.
 class ChatDetailPage extends StatelessWidget {
   const ChatDetailPage({super.key, required this.conversationId});
 
@@ -10,15 +15,10 @@ class ChatDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: const BackToFeedButton(),
-        title: const Text('Chat'),
-      ),
-      body: EmptyStateView(
-        icon: Icons.chat_outlined,
-        title: 'Chat',
-        message: 'Messages in "$conversationId" arrive in Phase 6.',
+    return BlocProvider(
+      create: (_) => getIt<ChatDetailCubit>(param1: conversationId)..load(),
+      child: ChatDetailView(
+        onOpenProfile: (userId) => openProfile(context, userId),
       ),
     );
   }

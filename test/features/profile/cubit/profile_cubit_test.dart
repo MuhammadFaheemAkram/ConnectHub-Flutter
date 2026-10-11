@@ -8,12 +8,14 @@ import 'package:connect_hub/domain/usecase/bookmark_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/like_post_use_case.dart';
 import 'package:connect_hub/domain/usecase/refresh_user_posts_use_case.dart';
 import 'package:connect_hub/domain/usecase/refresh_user_use_case.dart';
+import 'package:connect_hub/domain/usecase/watch_cache_cleared_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_user_posts_use_case.dart';
 import 'package:connect_hub/domain/usecase/watch_user_use_case.dart';
 import 'package:connect_hub/features/profile/cubit/profile_cubit.dart';
 import 'package:connect_hub/features/profile/cubit/profile_state.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../../helpers/fakes/fake_cache_repository.dart';
 import '../../../helpers/fakes/fake_post_repository.dart';
 import '../../../helpers/fakes/fake_profile_repository.dart';
 import '../../../helpers/fixtures.dart';
@@ -21,6 +23,7 @@ import '../../../helpers/fixtures.dart';
 void main() {
   late FakeProfileRepository profiles;
   late FakePostRepository posts;
+  late FakeCacheRepository cache;
 
   final p1 = samplePost('p1');
   final p6 = samplePost('p6');
@@ -29,11 +32,13 @@ void main() {
   setUp(() {
     profiles = FakeProfileRepository();
     posts = FakePostRepository();
+    cache = FakeCacheRepository();
   });
 
   tearDown(() async {
     await profiles.dispose();
     await posts.dispose();
+    await cache.dispose();
   });
 
   ProfileCubit buildCubit({String userId = 'u_ada'}) => ProfileCubit(
@@ -44,6 +49,7 @@ void main() {
     RefreshUserPostsUseCase(profiles),
     LikePostUseCase(posts),
     BookmarkPostUseCase(posts),
+    WatchCacheClearedUseCase(cache),
   );
 
   group('loading', () {
@@ -234,5 +240,32 @@ void main() {
       ),
     ],
     verify: (_) => expect(posts.likeCalls, [(postId: 'p1', liked: true)]),
+  );
+
+  blocTest<ProfileCubit, ProfileState>(
+    'after "Clear cache", the posts load again: a spinner, never "No posts '
+    'yet"',
+    setUp: () => profiles = FakeProfileRepository(
+      cachedUsers: [ada],
+      cachedPosts: {
+        'u_ada': [p1, p6],
+      },
+    )..refreshedPosts = [p1, p6],
+    build: buildCubit,
+    act: (cubit) async {
+      await cubit.load();
+      profiles.refreshPostsGate = Completer<void>();
+      await cache.clearCache();
+      // The wipe keeps the user (here, the profile's) but not the posts.
+      profiles.replacePosts('u_ada', const []);
+      await pumpEventQueue();
+      profiles.refreshPostsGate!.complete();
+      await pumpEventQueue();
+    },
+    expect: () => [
+      ProfileState.loaded(user: ada, posts: [p1, p6]),
+      const ProfileState.loaded(user: ada, isLoadingPosts: true),
+      ProfileState.loaded(user: ada, posts: [p1, p6]),
+    ],
   );
 }
