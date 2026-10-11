@@ -72,4 +72,47 @@ void main() {
       expect(Validators.name('a' * 51), 'Name must be 50 characters or fewer.');
     });
   });
+
+  group('post content', () {
+    test('is required (whitespace counts as empty)', () {
+      expect(Validators.postContent(''), 'Write something to share.');
+      expect(Validators.postContent('  \n '), 'Write something to share.');
+    });
+
+    test('is at most 280 characters, counted on the raw text', () {
+      expect(Validators.postContent('a' * 280), isNull);
+      expect(
+        Validators.postContent('a' * 281),
+        'Posts are limited to 280 characters.',
+      );
+      // Surrounding spaces count, exactly as the counter shows them.
+      expect(
+        Validators.postContent(' ${'a' * 279} '),
+        'Posts are limited to 280 characters.',
+      );
+    });
+
+    test('counts characters as people see them: an emoji is one', () {
+      expect(Validators.lengthOf('👍🏽'), 1);
+      expect('👍🏽'.length, 4);
+      expect(Validators.postContent('👍🏽' * 280), isNull);
+    });
+  });
+
+  group('image URL', () {
+    test('is optional', () {
+      expect(Validators.imageUrl(''), isNull);
+      expect(Validators.imageUrl('   '), isNull);
+    });
+
+    test('must be an http or https URL with a host', () {
+      const message = 'Enter a valid image URL, or leave it empty.';
+      expect(Validators.imageUrl('https://picsum.photos/600/400'), isNull);
+      expect(Validators.imageUrl(' http://example.com/a.png '), isNull);
+      expect(Validators.imageUrl('picsum.photos/600'), message);
+      expect(Validators.imageUrl('ftp://example.com/a.png'), message);
+      expect(Validators.imageUrl('https://'), message);
+      expect(Validators.imageUrl('not a url'), message);
+    });
+  });
 }

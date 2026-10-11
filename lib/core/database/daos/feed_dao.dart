@@ -30,15 +30,9 @@ class FeedDao extends DatabaseAccessor<AppDatabase> with _$FeedDaoMixin {
           OrderingTerm.desc(posts.createdAt),
           OrderingTerm.desc(posts.id),
         ]);
+    final postsDao = attachedDatabase.postsDao;
     return query.watch().map(
-      (rows) => [
-        for (final row in rows)
-          (
-            post: row.readTable(posts),
-            author: row.readTable(users),
-            bookmarkedAt: row.readTableOrNull(bookmarks)?.bookmarkedAt,
-          ),
-      ],
+      (rows) => [for (final row in rows) postsDao.readPost(row)],
     );
   }
 
@@ -53,10 +47,12 @@ class FeedDao extends DatabaseAccessor<AppDatabase> with _$FeedDaoMixin {
     });
   }
 
-  /// Appends [page] to the window (load more). A post already in the window
-  /// is updated, never listed twice.
-  Future<void> appendToFeed(List<CachedPost> page) {
-    return transaction(() => _add(page));
+  /// Adds [entries] to the window: the next page (load more), or a post just
+  /// created. Where each one shows comes from its date, so a new post lands
+  /// on top and a next page at the bottom. A post already in the window is
+  /// updated, never listed twice.
+  Future<void> addToFeed(List<CachedPost> entries) {
+    return transaction(() => _add(entries));
   }
 
   Future<void> _add(List<CachedPost> page) async {

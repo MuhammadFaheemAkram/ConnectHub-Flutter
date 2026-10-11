@@ -1,26 +1,32 @@
-import 'package:connect_hub/core/design_system/design_system.dart';
-import 'package:connect_hub/core/navigation/back_to_feed_button.dart';
+import 'package:connect_hub/core/navigation/app_routes.dart';
+import 'package:connect_hub/di/injection.dart';
+import 'package:connect_hub/features/create_post/create_post_view.dart';
+import 'package:connect_hub/features/create_post/cubit/create_post_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Placeholder for Create Post (the real composer arrives in Phase 4).
-///
-/// It is shown as a full-screen dialog (see `CreatePostRoute`), so the app bar
-/// shows a close button instead of Back.
+/// The New post screen's entry point, shown as a full-screen dialog (see
+/// `CreatePostRoute`).
 class CreatePostPage extends StatelessWidget {
   const CreatePostPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: const BackToFeedButton.close(),
-        title: const Text('New post'),
-      ),
-      body: const EmptyStateView(
-        icon: Icons.edit_note,
-        title: 'New post',
-        message: 'The composer arrives in Phase 4.',
-      ),
+    return BlocProvider(
+      create: (_) => getIt<CreatePostCubit>(),
+      child: CreatePostView(onClose: () => _close(context)),
     );
+  }
+
+  /// `pop()` closes the page even while a `PopScope` holds a draft: it is
+  /// only called after publishing or confirming the discard. Opened directly
+  /// (a deep link), there is nothing underneath, so it goes to the Feed.
+  static void _close(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      const FeedRoute().go(context);
+    }
   }
 }

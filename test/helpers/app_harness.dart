@@ -25,4 +25,11 @@ extension AppHarness on WidgetTester {
     await tap(finder);
     await pumpAndSettle();
   }
+
+  /// Scrolls [finder] into view first, for widgets below the fold.
+  Future<void> scrollToAndTap(Finder finder) async {
+    await ensureVisible(finder);
+    await pumpAndSettle();
+    await tapAndSettle(finder);
+  }
 }

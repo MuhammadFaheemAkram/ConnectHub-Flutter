@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:connect_hub/core/common/first_value.dart';
 import 'package:connect_hub/core/common/result.dart';
 import 'package:connect_hub/core/common/ui_message.dart';
 import 'package:connect_hub/domain/model/post.dart';
@@ -118,7 +119,7 @@ class FeedCubit extends Cubit<FeedState> {
         // so `_posts` can still be the window from before the refresh. Read
         // the current one: an empty window that is about to fill up must
         // never flash "No posts yet".
-        _posts = await _watchFeed().first;
+        _posts = await _watchFeed().firstValue;
         if (isClosed) return;
       case Err(:final exception):
         _refresh = _Refresh.failed;

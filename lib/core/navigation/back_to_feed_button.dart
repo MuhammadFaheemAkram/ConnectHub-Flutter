@@ -20,7 +20,9 @@ class BackToFeedButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (context.canPop()) {
+    // Without a router above it (a view's widget test), it is a plain button.
+    final router = GoRouter.maybeOf(context);
+    if (router == null || router.canPop()) {
       return _close ? const CloseButton() : const BackButton();
     }
     return IconButton(

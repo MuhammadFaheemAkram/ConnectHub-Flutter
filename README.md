@@ -35,8 +35,8 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 | 1 | Foundation: FVM project, design system base, typed routes with a sign-in gate, 5-tab shell, CI | ✅ Done |
 | 2 | Fake auth + session: in-memory fake server, secure storage, `AuthBloc`, Login / Sign Up | ✅ Done |
 | 3 | Feed + fake network + offline cache: drift v1, cursor paging, optimistic likes and bookmarks | ✅ Done |
-| 4 | Post detail + comments + create post | ⏳ Next |
-| 5 | Search + bookmarks + profile | ⬜ |
+| 4 | Post detail, comments and create post; drift v2 with a tested migration | ✅ Done |
+| 5 | Search + bookmarks + profile | ⏳ Next |
 | 6 | Chat + notifications + settings | ⬜ |
 | 7 | Open-source polish and final docs | ⬜ |
 
@@ -73,6 +73,7 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 | Images | `cached_network_image` (avatars and post images, with fallbacks offline) | 3 |
 | Time and formatting | `clock` (an injectable `Clock`), `intl` (dates, compact counts like "4.8K") | 3 |
 | Async coordination | `synchronized` (a `Lock`, so refresh and load-more take turns) | 3 |
+| Text | `characters` (the 280-character limit counts what people see: an emoji is one) | 4 |
 | Preferences | `shared_preferences` (`SharedPreferencesWithCache`) | 6 |
 | Testing | `flutter_test`, `bloc_test`, `mocktail` | 1+ |
 | Lints / CI | `flutter_lints` + strict analyzer modes; GitHub Actions | 1 |
@@ -197,11 +198,12 @@ fvm dart run build_runner build
 
 ## 🌐 How the Fake Backend Works
 
-There is no server. `FakeServer` is an in-memory stand-in that owns the data and its rules: accounts, tokens, posts, likes and bookmarks now; comments and chats in later phases.
+There is no server. `FakeServer` is an in-memory stand-in that owns the data and its rules: accounts, tokens, posts, likes, bookmarks and comments now; chats in a later phase.
 - **Seed:** it seeds itself on first use from [`assets/json/`](assets/json/): the iOS edition's JSON, plus two posts by the demo user (`p16`, `p17`) and the two comments on them (`c12`, `c13`).
 - **Fresh dates:** every seed date is shifted by the same amount at launch, so the newest record is five minutes old and the feed always looks recent. Gaps between records are kept.
 - **Server rules:** likes and bookmarks are per user and idempotent; `likeCount` starts from the seed and moves with likes; `commentCount` is always counted from the comments themselves (the iOS seed claims 18 comments on `p1` and ships 3).
 - **Paging:** the feed comes newest first in pages of 6, each ending with an opaque cursor (`<createdAt>|<id>`). The 17 posts arrive as 6 / 6 / 5.
+- **Posts and comments:** a new post is written by whoever the token belongs to and heads the first page. Comments come oldest first. Only a comment's author may delete it; anyone else gets a 404, as many real APIs answer, so a stranger can't confirm the comment exists. A request that breaks the rules (a blank post, over 280 characters, a bad image URL) is refused like a 400.
 - **Access:** the app reaches it only through Retrofit-style API services (`AuthApiService`, `FeedApiService` and their `Fake…` implementations), so a real `dio` client could replace them without changing any caller. `FakeApiClient` plays the HTTP client: it attaches the saved token, crosses the simulated network, and lets the server resolve the token (a 401 if it can't).
 - **Transport:** `NetworkSimulator` adds latency (800 ms for sign-in, 700 ms for a feed page, 350 ms for a like) and can fail every request, as if offline (`AppConfig.simulateNetworkErrors`).
 - **Errors:** the server throws typed `AppException`s:
@@ -225,13 +227,15 @@ The fake server owns the data; drift (SQLite) holds the client's copy of it.
 
 | Data | Source of truth | Client copy |
 |---|---|---|
-| profiles, posts, likes, bookmarks | the fake server | drift (cache) |
+| profiles, posts, likes, bookmarks, comments | the fake server | drift (cache) |
 | session (token, user id, email) | the client | `flutter_secure_storage` |
 
-- **Schema v1:** `users`, `posts` (→ `users`), `feed_items` (the feed window, → `posts`) and `bookmarks` (→ `posts`), with foreign keys turned on (`PRAGMA foreign_keys = ON`). Every schema version is exported to [`drift_schemas/`](drift_schemas/) with `drift_dev make-migrations`, so later phases ship tested migrations.
+- **Schema v2:** `users`, `posts` (→ `users`), `feed_items` (the feed window, → `posts`), `bookmarks` (→ `posts`) and, since Phase 4, `comments` (→ `posts` with `ON DELETE CASCADE`, → `users`). Foreign keys are turned on (`PRAGMA foreign_keys = ON`).
+- **Migrations are generated and tested.** Every schema version is exported to [`drift_schemas/`](drift_schemas/) with `drift_dev make-migrations`, which also writes `app_database.steps.dart` (each step sees the schema as it was) and a test that runs every upgrade path, plus a data-integrity test for v1 → v2.
 - **The feed is its own table.** `feed_items` lists which cached posts are in the feed. A refresh replaces exactly that list, and posts cached by other screens never leak into the feed.
 - **Upserts, never REPLACE.** SQLite's REPLACE deletes the old row first, and the delete cascades: that is how the Android edition silently lost bookmarks. Every write here is `INSERT … ON CONFLICT DO UPDATE` (a test shows what REPLACE would have done).
 - **Reads JOIN `users`**, so renaming a person renames every post they wrote at once.
+- **The server's answer decides what stays.** A refresh (of the feed, a post or its comments) mirrors the server: it upserts what came back and deletes what the server no longer has, in one transaction. A post that answers 404 leaves the cache, with its comments.
 - **Optimistic likes and bookmarks:** drift first, then the server. The server's answer replaces the guess; a failure restores the state from before the tap. A second tap while a request is out is ignored.
 - **The cache belongs to one user.** Logout and session expiry wipe it before the token is deleted, and an answer that arrives after the session ended is dropped instead of being cached for the next user.
 
@@ -243,7 +247,13 @@ fvm dart format --output=none --set-exit-if-changed .
 fvm flutter test
 ```
 
-**236 tests** after Phase 3:
+**352 tests** after Phase 4:
+- **Posts and comments** (Phase 4):
+  - the fake server's post and comment endpoints, and the validators for post text and image URLs;
+  - drift: the comments DAO (mirroring, counts that never go below zero, writes that skip a post no longer cached) and the generated **migration tests** (every upgrade path, and v1 → v2 data integrity);
+  - `CommentRepository` / `PostRepository`: a deep-linked post fetched before its comments, optimistic delete with rollback, someone else's comment refused, a created post heading the feed;
+  - `PostDetailCubit`, `CommentsCubit`, `CreatePostCubit` (`bloc_test`), their views, and the comment tile, input and counter;
+  - app-level: open a post, comment, delete, create a post, discard a draft, a post that no longer exists.
 - **Feed** (Phase 3):
   - the fake server's feed slice: rebased dates, derived comment counts, pages 6 / 6 / 5 with no overlap, idempotent likes, per-user bookmarks;
   - drift: the feed JOIN and its order, window replace and append, foreign keys, and the REPLACE-cascade regression;
@@ -299,6 +309,7 @@ CI (`.github/workflows/flutter-ci.yml`) runs on every push to `main` and every p
 - [Phase 1 — Foundation](docs/PHASE_1_SUMMARY.md)
 - [Phase 2 — Fake Auth + Session](docs/PHASE_2_SUMMARY.md)
 - [Phase 3 — Feed + Offline Cache](docs/PHASE_3_SUMMARY.md)
+- [Phase 4 — Post Detail, Comments + Create Post](docs/PHASE_4_SUMMARY.md)
 
 ---
 

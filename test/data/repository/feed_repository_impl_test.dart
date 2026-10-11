@@ -4,15 +4,15 @@ import 'package:connect_hub/core/common/app_exception.dart';
 import 'package:connect_hub/core/common/result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/data_stack.dart';
 import '../../helpers/database_rows.dart';
-import '../../helpers/feed_backend.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late FeedBackend backend;
+  late DataStack backend;
 
-  setUp(() => backend = FeedBackend());
+  setUp(() => backend = DataStack());
 
   tearDown(() => backend.dispose());
 

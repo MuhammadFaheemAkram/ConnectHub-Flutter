@@ -56,7 +56,7 @@ void main() {
   test('load more appends, and never lists a post twice', () async {
     await dao.replaceFeed([cachedPost('p1'), cachedPost('p2', minutesAgo: 1)]);
 
-    await dao.appendToFeed([
+    await dao.addToFeed([
       cachedPost('p2', minutesAgo: 1),
       cachedPost('p3', minutesAgo: 2),
     ]);

@@ -68,9 +68,7 @@ class FeedRepositoryImpl implements FeedRepository {
     if (_reachedEnd) return const Ok(false);
     final result = await _guard.run(() => _api.getFeed(cursor: _nextCursor));
     if (result case Ok(value: final page)) {
-      await _feed.appendToFeed([
-        for (final post in page.posts) post.toCached(),
-      ]);
+      await _feed.addToFeed([for (final post in page.posts) post.toCached()]);
       _continueAfter(page);
     }
     return _hasMore(result);

@@ -16,6 +16,7 @@ void main() {
       cachedPost('p1', bookmarkedAt: testNow),
       cachedPost('p2', authorId: 'u_grace'),
     ]);
+    await database.commentsDao.addComment(cachedComment('c1'));
 
     await database.cacheDao.clearAll();
 

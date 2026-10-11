@@ -14,11 +14,40 @@ typedef CachedPost = ({PostRow post, UserRow author, DateTime? bookmarkedAt});
 /// The signed-in user's like on one post.
 typedef LikeState = ({bool isLiked, int likeCount});
 
-/// Writes to cached posts, whichever screen loaded them, and the signed-in
-/// user's likes and bookmarks on them.
+/// Cached posts, whichever screen loaded them: one post as a live query,
+/// upserts, and the signed-in user's likes and bookmarks on them.
 @DriftAccessor(tables: [Users, Posts, Bookmarks])
 class PostsDao extends DatabaseAccessor<AppDatabase> with _$PostsDaoMixin {
   PostsDao(super.attachedDatabase);
+
+  /// One cached post with its author and the viewer's bookmark, emitted again
+  /// whenever any of the three changes; `null` while it isn't cached.
+  Stream<CachedPost?> watchPost(String postId) {
+    final query = select(posts).join([
+      innerJoin(users, users.id.equalsExp(posts.authorId)),
+      leftOuterJoin(bookmarks, bookmarks.postId.equalsExp(posts.id)),
+    ])..where(posts.id.equals(postId));
+    return query.watchSingleOrNull().map(
+      (row) => row == null ? null : readPost(row),
+    );
+  }
+
+  /// Reads one row of a query that JOINs posts with their authors and LEFT
+  /// JOINs bookmarks. The feed's query shares it.
+  CachedPost readPost(TypedResult row) => (
+    post: row.readTable(posts),
+    author: row.readTable(users),
+    bookmarkedAt: row.readTableOrNull(bookmarks)?.bookmarkedAt,
+  );
+
+  Future<bool> isCached(String postId) async => await _find(postId) != null;
+
+  /// Removes a post the server no longer has.
+  ///
+  /// The delete cascades to its place in the feed, its bookmark and its
+  /// comments: here, unlike in an upsert, that is exactly what's wanted.
+  Future<void> deletePost(String postId) =>
+      (delete(posts)..where((post) => post.id.equals(postId))).go();
 
   /// Saves posts as the server returned them: the posts, their authors, and
   /// the viewer's bookmark on each, in one batch (one transaction).
@@ -26,7 +55,7 @@ class PostsDao extends DatabaseAccessor<AppDatabase> with _$PostsDaoMixin {
   /// Every write is an upsert (`INSERT … ON CONFLICT DO UPDATE`), never
   /// `insertOrReplace`. REPLACE deletes the existing row before inserting the
   /// new one, and that delete cascades to everything referencing the post:
-  /// its place in the feed, its bookmark, and later its comments.
+  /// its place in the feed, its bookmark and its comments.
   Future<void> upsertPosts(List<CachedPost> entries) {
     return batch((batch) {
       batch

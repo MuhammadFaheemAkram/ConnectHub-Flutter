@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connect_hub/core/network/api/feed_api_service.dart';
+import 'package:connect_hub/core/network/dto/create_post_request_dto.dart';
 import 'package:connect_hub/core/network/dto/post_dto.dart';
 import 'package:connect_hub/core/network/dto/post_page_dto.dart';
 
@@ -12,7 +13,8 @@ class GatedFeedApi implements FeedApiService {
 
   final FeedApiService _inner;
 
-  /// Requests as `feed:<cursor or top>`, `like:<postId>`, `bookmark:<postId>`.
+  /// Requests as `feed:<cursor or top>`, `post:<postId>`, `create`,
+  /// `like:<postId>`, `bookmark:<postId>`.
   final requests = <String>[];
 
   /// While set and not completed, requests wait for it.
@@ -23,6 +25,20 @@ class GatedFeedApi implements FeedApiService {
     requests.add('feed:${cursor ?? 'top'}');
     await gate?.future;
     return _inner.getFeed(cursor: cursor, limit: limit);
+  }
+
+  @override
+  Future<PostDto> getPost(String postId) async {
+    requests.add('post:$postId');
+    await gate?.future;
+    return _inner.getPost(postId);
+  }
+
+  @override
+  Future<PostDto> createPost(CreatePostRequestDto request) async {
+    requests.add('create');
+    await gate?.future;
+    return _inner.createPost(request);
   }
 
   @override

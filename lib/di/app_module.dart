@@ -1,6 +1,7 @@
 import 'package:clock/clock.dart';
 import 'package:connect_hub/core/database/app_database.dart';
 import 'package:connect_hub/core/database/daos/cache_dao.dart';
+import 'package:connect_hub/core/database/daos/comments_dao.dart';
 import 'package:connect_hub/core/database/daos/feed_dao.dart';
 import 'package:connect_hub/core/database/daos/posts_dao.dart';
 import 'package:flutter/services.dart';
@@ -33,6 +34,9 @@ abstract class AppModule {
 
   @lazySingleton
   FeedDao feedDao(AppDatabase database) => database.feedDao;
+
+  @lazySingleton
+  CommentsDao commentsDao(AppDatabase database) => database.commentsDao;
 
   @lazySingleton
   CacheDao cacheDao(AppDatabase database) => database.cacheDao;

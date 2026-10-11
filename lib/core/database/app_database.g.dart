@@ -1337,6 +1337,377 @@ class BookmarksCompanion extends UpdateCompanion<BookmarkRow> {
   }
 }
 
+class $CommentsTable extends Comments
+    with TableInfo<$CommentsTable, CommentRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CommentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _postIdMeta = const VerificationMeta('postId');
+  @override
+  late final GeneratedColumn<String> postId = GeneratedColumn<String>(
+    'post_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES posts (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _authorIdMeta = const VerificationMeta(
+    'authorId',
+  );
+  @override
+  late final GeneratedColumn<String> authorId = GeneratedColumn<String>(
+    'author_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES users (id)',
+    ),
+  );
+  static const VerificationMeta _contentMeta = const VerificationMeta(
+    'content',
+  );
+  @override
+  late final GeneratedColumn<String> content = GeneratedColumn<String>(
+    'content',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    postId,
+    authorId,
+    content,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'comments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CommentRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('post_id')) {
+      context.handle(
+        _postIdMeta,
+        postId.isAcceptableOrUnknown(data['post_id']!, _postIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_postIdMeta);
+    }
+    if (data.containsKey('author_id')) {
+      context.handle(
+        _authorIdMeta,
+        authorId.isAcceptableOrUnknown(data['author_id']!, _authorIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_authorIdMeta);
+    }
+    if (data.containsKey('content')) {
+      context.handle(
+        _contentMeta,
+        content.isAcceptableOrUnknown(data['content']!, _contentMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_contentMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CommentRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CommentRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      postId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}post_id'],
+      )!,
+      authorId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}author_id'],
+      )!,
+      content: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}content'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CommentsTable createAlias(String alias) {
+    return $CommentsTable(attachedDatabase, alias);
+  }
+}
+
+class CommentRow extends DataClass implements Insertable<CommentRow> {
+  final String id;
+  final String postId;
+  final String authorId;
+
+  /// The comment's text. (A column named `text` would hide drift's `text()`
+  /// column builder inside this class.)
+  final String content;
+
+  /// UTC, stored as ISO-8601 text (see `build.yaml`).
+  final DateTime createdAt;
+  const CommentRow({
+    required this.id,
+    required this.postId,
+    required this.authorId,
+    required this.content,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['post_id'] = Variable<String>(postId);
+    map['author_id'] = Variable<String>(authorId);
+    map['content'] = Variable<String>(content);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  CommentsCompanion toCompanion(bool nullToAbsent) {
+    return CommentsCompanion(
+      id: Value(id),
+      postId: Value(postId),
+      authorId: Value(authorId),
+      content: Value(content),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory CommentRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CommentRow(
+      id: serializer.fromJson<String>(json['id']),
+      postId: serializer.fromJson<String>(json['postId']),
+      authorId: serializer.fromJson<String>(json['authorId']),
+      content: serializer.fromJson<String>(json['content']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'postId': serializer.toJson<String>(postId),
+      'authorId': serializer.toJson<String>(authorId),
+      'content': serializer.toJson<String>(content),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  CommentRow copyWith({
+    String? id,
+    String? postId,
+    String? authorId,
+    String? content,
+    DateTime? createdAt,
+  }) => CommentRow(
+    id: id ?? this.id,
+    postId: postId ?? this.postId,
+    authorId: authorId ?? this.authorId,
+    content: content ?? this.content,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  CommentRow copyWithCompanion(CommentsCompanion data) {
+    return CommentRow(
+      id: data.id.present ? data.id.value : this.id,
+      postId: data.postId.present ? data.postId.value : this.postId,
+      authorId: data.authorId.present ? data.authorId.value : this.authorId,
+      content: data.content.present ? data.content.value : this.content,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommentRow(')
+          ..write('id: $id, ')
+          ..write('postId: $postId, ')
+          ..write('authorId: $authorId, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, postId, authorId, content, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CommentRow &&
+          other.id == this.id &&
+          other.postId == this.postId &&
+          other.authorId == this.authorId &&
+          other.content == this.content &&
+          other.createdAt == this.createdAt);
+}
+
+class CommentsCompanion extends UpdateCompanion<CommentRow> {
+  final Value<String> id;
+  final Value<String> postId;
+  final Value<String> authorId;
+  final Value<String> content;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const CommentsCompanion({
+    this.id = const Value.absent(),
+    this.postId = const Value.absent(),
+    this.authorId = const Value.absent(),
+    this.content = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CommentsCompanion.insert({
+    required String id,
+    required String postId,
+    required String authorId,
+    required String content,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       postId = Value(postId),
+       authorId = Value(authorId),
+       content = Value(content),
+       createdAt = Value(createdAt);
+  static Insertable<CommentRow> custom({
+    Expression<String>? id,
+    Expression<String>? postId,
+    Expression<String>? authorId,
+    Expression<String>? content,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (postId != null) 'post_id': postId,
+      if (authorId != null) 'author_id': authorId,
+      if (content != null) 'content': content,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CommentsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? postId,
+    Value<String>? authorId,
+    Value<String>? content,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return CommentsCompanion(
+      id: id ?? this.id,
+      postId: postId ?? this.postId,
+      authorId: authorId ?? this.authorId,
+      content: content ?? this.content,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (postId.present) {
+      map['post_id'] = Variable<String>(postId.value);
+    }
+    if (authorId.present) {
+      map['author_id'] = Variable<String>(authorId.value);
+    }
+    if (content.present) {
+      map['content'] = Variable<String>(content.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CommentsCompanion(')
+          ..write('id: $id, ')
+          ..write('postId: $postId, ')
+          ..write('authorId: $authorId, ')
+          ..write('content: $content, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -1344,8 +1715,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $PostsTable posts = $PostsTable(this);
   late final $FeedItemsTable feedItems = $FeedItemsTable(this);
   late final $BookmarksTable bookmarks = $BookmarksTable(this);
+  late final $CommentsTable comments = $CommentsTable(this);
   late final PostsDao postsDao = PostsDao(this as AppDatabase);
   late final FeedDao feedDao = FeedDao(this as AppDatabase);
+  late final CommentsDao commentsDao = CommentsDao(this as AppDatabase);
   late final CacheDao cacheDao = CacheDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -1356,6 +1729,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     posts,
     feedItems,
     bookmarks,
+    comments,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -1372,6 +1746,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('bookmarks', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'posts',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('comments', kind: UpdateKind.delete)],
     ),
   ]);
   @override
@@ -1416,6 +1797,24 @@ final class $$UsersTableReferences
     ).filter((f) => f.authorId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_postsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$CommentsTable, List<CommentRow>>
+  _commentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.comments,
+    aliasName: 'users__id__comments__author_id',
+  );
+
+  $$CommentsTableProcessedTableManager get commentsRefs {
+    final manager = $$CommentsTableTableManager(
+      $_db,
+      $_db.comments,
+    ).filter((f) => f.authorId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_commentsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -1476,6 +1875,31 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
           }) => $$PostsTableFilterComposer(
             $db: $db,
             $table: $db.posts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> commentsRefs(
+    Expression<bool> Function($$CommentsTableFilterComposer f) f,
+  ) {
+    final $$CommentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.comments,
+      getReferencedColumn: (t) => t.authorId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentsTableFilterComposer(
+            $db: $db,
+            $table: $db.comments,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -1581,6 +2005,31 @@ class $$UsersTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> commentsRefs<T extends Object>(
+    Expression<T> Function($$CommentsTableAnnotationComposer a) f,
+  ) {
+    final $$CommentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.comments,
+      getReferencedColumn: (t) => t.authorId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.comments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$UsersTableTableManager
@@ -1596,7 +2045,7 @@ class $$UsersTableTableManager
           $$UsersTableUpdateCompanionBuilder,
           (UserRow, $$UsersTableReferences),
           UserRow,
-          PrefetchHooks Function({bool postsRefs})
+          PrefetchHooks Function({bool postsRefs, bool commentsRefs})
         > {
   $$UsersTableTableManager(_$AppDatabase db, $UsersTable table)
     : super(
@@ -1653,10 +2102,13 @@ class $$UsersTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({postsRefs = false}) {
+          prefetchHooksCallback: ({postsRefs = false, commentsRefs = false}) {
             return PrefetchHooks(
               db: db,
-              explicitlyWatchedTables: [if (postsRefs) db.posts],
+              explicitlyWatchedTables: [
+                if (postsRefs) db.posts,
+                if (commentsRefs) db.comments,
+              ],
               addJoins: null,
               getPrefetchedDataCallback: (items) async {
                 return [
@@ -1668,6 +2120,17 @@ class $$UsersTableTableManager
                       ),
                       managerFromTypedResult: (p0) =>
                           $$UsersTableReferences(db, table, p0).postsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.authorId == item.id),
+                      typedResults: items,
+                    ),
+                  if (commentsRefs)
+                    await $_getPrefetchedData<UserRow, $UsersTable, CommentRow>(
+                      currentTable: table,
+                      referencedTable: $$UsersTableReferences
+                          ._commentsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$UsersTableReferences(db, table, p0).commentsRefs,
                       referencedItemsForCurrentItem: (item, referencedItems) =>
                           referencedItems.where((e) => e.authorId == item.id),
                       typedResults: items,
@@ -1692,7 +2155,7 @@ typedef $$UsersTableProcessedTableManager =
       $$UsersTableUpdateCompanionBuilder,
       (UserRow, $$UsersTableReferences),
       UserRow,
-      PrefetchHooks Function({bool postsRefs})
+      PrefetchHooks Function({bool postsRefs, bool commentsRefs})
     >;
 typedef $$PostsTableCreateCompanionBuilder = PostsCompanion Function({
   required String id,
@@ -1769,6 +2232,24 @@ final class $$PostsTableReferences
     ).filter((f) => f.postId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_bookmarksRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$CommentsTable, List<CommentRow>>
+  _commentsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.comments,
+    aliasName: 'posts__id__comments__post_id',
+  );
+
+  $$CommentsTableProcessedTableManager get commentsRefs {
+    final manager = $$CommentsTableTableManager(
+      $_db,
+      $_db.comments,
+    ).filter((f) => f.postId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_commentsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -1882,6 +2363,31 @@ class $$PostsTableFilterComposer extends Composer<_$AppDatabase, $PostsTable> {
           }) => $$BookmarksTableFilterComposer(
             $db: $db,
             $table: $db.bookmarks,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> commentsRefs(
+    Expression<bool> Function($$CommentsTableFilterComposer f) f,
+  ) {
+    final $$CommentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.comments,
+      getReferencedColumn: (t) => t.postId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentsTableFilterComposer(
+            $db: $db,
+            $table: $db.comments,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -2064,6 +2570,31 @@ class $$PostsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> commentsRefs<T extends Object>(
+    Expression<T> Function($$CommentsTableAnnotationComposer a) f,
+  ) {
+    final $$CommentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.comments,
+      getReferencedColumn: (t) => t.postId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CommentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.comments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$PostsTableTableManager
@@ -2083,6 +2614,7 @@ class $$PostsTableTableManager
             bool authorId,
             bool feedItemsRefs,
             bool bookmarksRefs,
+            bool commentsRefs,
           })
         > {
   $$PostsTableTableManager(_$AppDatabase db, $PostsTable table)
@@ -2153,12 +2685,14 @@ class $$PostsTableTableManager
                 authorId = false,
                 feedItemsRefs = false,
                 bookmarksRefs = false,
+                commentsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (feedItemsRefs) db.feedItems,
                     if (bookmarksRefs) db.bookmarks,
+                    if (commentsRefs) db.comments,
                   ],
                   addJoins:
                       <
@@ -2234,6 +2768,27 @@ class $$PostsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (commentsRefs)
+                        await $_getPrefetchedData<
+                          PostRow,
+                          $PostsTable,
+                          CommentRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$PostsTableReferences
+                              ._commentsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$PostsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).commentsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.postId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -2258,6 +2813,7 @@ typedef $$PostsTableProcessedTableManager =
         bool authorId,
         bool feedItemsRefs,
         bool bookmarksRefs,
+        bool commentsRefs,
       })
     >;
 typedef $$FeedItemsTableCreateCompanionBuilder = FeedItemsCompanion Function({
@@ -2747,6 +3303,404 @@ typedef $$BookmarksTableProcessedTableManager =
       BookmarkRow,
       PrefetchHooks Function({bool postId})
     >;
+typedef $$CommentsTableCreateCompanionBuilder = CommentsCompanion Function({
+  required String id,
+  required String postId,
+  required String authorId,
+  required String content,
+  required DateTime createdAt,
+  Value<int> rowid,
+});
+typedef $$CommentsTableUpdateCompanionBuilder = CommentsCompanion Function({
+  Value<String> id,
+  Value<String> postId,
+  Value<String> authorId,
+  Value<String> content,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+final class $$CommentsTableReferences
+    extends BaseReferences<_$AppDatabase, $CommentsTable, CommentRow> {
+  $$CommentsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $PostsTable _postIdTable(_$AppDatabase db) =>
+      db.posts.createAlias('comments__post_id__posts__id');
+
+  $$PostsTableProcessedTableManager get postId {
+    final $_column = $_itemColumn<String>('post_id')!;
+
+    final manager = $$PostsTableTableManager(
+      $_db,
+      $_db.posts,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_postIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $UsersTable _authorIdTable(_$AppDatabase db) =>
+      db.users.createAlias('comments__author_id__users__id');
+
+  $$UsersTableProcessedTableManager get authorId {
+    final $_column = $_itemColumn<String>('author_id')!;
+
+    final manager = $$UsersTableTableManager(
+      $_db,
+      $_db.users,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_authorIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$CommentsTableFilterComposer
+    extends Composer<_$AppDatabase, $CommentsTable> {
+  $$CommentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$PostsTableFilterComposer get postId {
+    final $$PostsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.postId,
+      referencedTable: $db.posts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PostsTableFilterComposer(
+            $db: $db,
+            $table: $db.posts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableFilterComposer get authorId {
+    final $$UsersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.authorId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableFilterComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CommentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CommentsTable> {
+  $$CommentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get content => $composableBuilder(
+    column: $table.content,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$PostsTableOrderingComposer get postId {
+    final $$PostsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.postId,
+      referencedTable: $db.posts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PostsTableOrderingComposer(
+            $db: $db,
+            $table: $db.posts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableOrderingComposer get authorId {
+    final $$UsersTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.authorId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableOrderingComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CommentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CommentsTable> {
+  $$CommentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get content =>
+      $composableBuilder(column: $table.content, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$PostsTableAnnotationComposer get postId {
+    final $$PostsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.postId,
+      referencedTable: $db.posts,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$PostsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.posts,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$UsersTableAnnotationComposer get authorId {
+    final $$UsersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.authorId,
+      referencedTable: $db.users,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$UsersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.users,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$CommentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CommentsTable,
+          CommentRow,
+          $$CommentsTableFilterComposer,
+          $$CommentsTableOrderingComposer,
+          $$CommentsTableAnnotationComposer,
+          $$CommentsTableCreateCompanionBuilder,
+          $$CommentsTableUpdateCompanionBuilder,
+          (CommentRow, $$CommentsTableReferences),
+          CommentRow,
+          PrefetchHooks Function({bool postId, bool authorId})
+        > {
+  $$CommentsTableTableManager(_$AppDatabase db, $CommentsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CommentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CommentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CommentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> postId = const Value.absent(),
+                Value<String> authorId = const Value.absent(),
+                Value<String> content = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CommentsCompanion(
+                id: id,
+                postId: postId,
+                authorId: authorId,
+                content: content,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String postId,
+                required String authorId,
+                required String content,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CommentsCompanion.insert(
+                id: id,
+                postId: postId,
+                authorId: authorId,
+                content: content,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$CommentsTable, CommentRow>(table),
+                  $$CommentsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({postId = false, authorId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (postId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.postId,
+                        referencedTable: $$CommentsTableReferences._postIdTable(
+                          db,
+                        ),
+                        referencedColumn: $$CommentsTableReferences
+                            ._postIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+                    if (authorId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.authorId,
+                        referencedTable: $$CommentsTableReferences
+                            ._authorIdTable(db),
+                        referencedColumn: $$CommentsTableReferences
+                            ._authorIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$CommentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CommentsTable,
+      CommentRow,
+      $$CommentsTableFilterComposer,
+      $$CommentsTableOrderingComposer,
+      $$CommentsTableAnnotationComposer,
+      $$CommentsTableCreateCompanionBuilder,
+      $$CommentsTableUpdateCompanionBuilder,
+      (CommentRow, $$CommentsTableReferences),
+      CommentRow,
+      PrefetchHooks Function({bool postId, bool authorId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -2759,4 +3713,6 @@ class $AppDatabaseManager {
       $$FeedItemsTableTableManager(_db, _db.feedItems);
   $$BookmarksTableTableManager get bookmarks =>
       $$BookmarksTableTableManager(_db, _db.bookmarks);
+  $$CommentsTableTableManager get comments =>
+      $$CommentsTableTableManager(_db, _db.comments);
 }

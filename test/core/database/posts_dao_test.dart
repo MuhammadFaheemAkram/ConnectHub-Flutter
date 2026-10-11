@@ -95,6 +95,33 @@ void main() {
     });
   });
 
+  group('one post', () {
+    test('watchPost follows a post, with its author and bookmark', () async {
+      await dao.upsertPosts([cachedPost('p1', bookmarkedAt: noon)]);
+
+      final post = await dao.watchPost('p1').first;
+
+      expect(post?.author.id, 'u_ada');
+      expect(post?.bookmarkedAt, noon);
+      expect(await dao.watchPost('p2').first, isNull);
+    });
+
+    test(
+      'deletePost removes the post with its feed place and bookmark',
+      () async {
+        await database.feedDao.replaceFeed([
+          cachedPost('p1', bookmarkedAt: noon),
+        ]);
+
+        await dao.deletePost('p1');
+
+        expect(await dao.isCached('p1'), isFalse);
+        expect(await database.select(database.feedItems).get(), isEmpty);
+        expect(await bookmarkOf('p1'), isNull);
+      },
+    );
+  });
+
   group('likes', () {
     test('applyLike flips the like at once, moves the count by one, and '
         'returns the state from before', () async {

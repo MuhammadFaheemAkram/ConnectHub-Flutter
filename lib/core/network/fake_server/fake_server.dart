@@ -2,7 +2,10 @@ import 'package:clock/clock.dart';
 import 'package:connect_hub/core/common/app_exception.dart';
 import 'package:connect_hub/core/common/demo_account.dart';
 import 'package:connect_hub/core/common/id_generator.dart';
+import 'package:connect_hub/core/common/validators.dart';
 import 'package:connect_hub/core/network/dto/auth_response_dto.dart';
+import 'package:connect_hub/core/network/dto/comment_dto.dart';
+import 'package:connect_hub/core/network/dto/create_post_request_dto.dart';
 import 'package:connect_hub/core/network/dto/post_dto.dart';
 import 'package:connect_hub/core/network/dto/post_page_dto.dart';
 import 'package:connect_hub/core/network/dto/user_dto.dart';
@@ -12,16 +15,16 @@ import 'package:injectable/injectable.dart';
 /// An in-memory stand-in for ConnectHub's backend.
 ///
 /// It plays the role a REST server would: it owns the data and its rules
-/// (accounts, tokens, posts, likes, bookmarks; later comments and chats). The
+/// (accounts, tokens, posts, likes, bookmarks, comments; later chats). The
 /// rest of the app reaches it **only** through the `…ApiService` interfaces,
 /// so a real HTTP client could replace the fake services without changing
 /// any caller.
 ///
 /// It lives in memory and seeds itself from the bundled JSON on first use.
 /// Every launch therefore starts from the same seed: accounts created by sign
-/// up, likes and bookmarks last until the app restarts. That's deliberate,
-/// because the backend is not the point of this project; how the app talks to
-/// it is.
+/// up, posts, likes, bookmarks and comments last until the app restarts.
+/// That's deliberate, because the backend is not the point of this project;
+/// how the app talks to it is.
 ///
 /// Transport concerns (latency, simulated failures, attaching the token) live
 /// in the fake API layer, not here.
@@ -45,7 +48,7 @@ class FakeServer {
   /// Posts by id.
   final _posts = <String, _ServerPost>{};
 
-  /// Every comment. Phase 3 only counts them; Phase 4 serves them.
+  /// Every comment, in the order they were added.
   final _comments = <_ServerComment>[];
 
   /// Tokens revoked by "Expire session" (Settings → Developer).
@@ -186,6 +189,95 @@ class FakeServer {
     return _postDto(post, viewerId);
   }
 
+  /// One post as [viewerId] sees it. Throws [NotFoundException] for an
+  /// unknown id.
+  Future<PostDto> getPost(String viewerId, String postId) async {
+    await _ready();
+    return _postDto(_post(postId), viewerId);
+  }
+
+  /// Publishes a post by [viewerId] and returns it. It is the newest post,
+  /// so it heads the feed's first page.
+  ///
+  /// The server checks the same rules as the client and stores the trimmed
+  /// text. A request that breaks them fails with a [FormatException], which a
+  /// real API would answer as 400 Bad Request.
+  Future<PostDto> createPost(
+    String viewerId,
+    CreatePostRequestDto request,
+  ) async {
+    await _ready();
+    final content = request.content.trim();
+    final imageUrl = request.imageUrl?.trim() ?? '';
+    if (Validators.postContent(content) != null ||
+        Validators.imageUrl(imageUrl) != null) {
+      throw FormatException('Invalid post', request.content);
+    }
+    final post = _ServerPost(
+      id: _ids.next('p'),
+      authorId: viewerId,
+      content: content,
+      imageUrl: imageUrl.isEmpty ? null : imageUrl,
+      createdAt: _clock.now().toUtc(),
+      seedLikes: 0,
+    );
+    _posts[post.id] = post;
+    return _postDto(post, viewerId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Comments
+
+  /// The comments on [postId], oldest first. Throws [NotFoundException] for
+  /// an unknown post.
+  Future<List<CommentDto>> getComments(String postId) async {
+    await _ready();
+    _post(postId);
+    final comments =
+        _comments.where((comment) => comment.postId == postId).toList()
+          ..sort(_ServerComment.oldestFirst);
+    return [for (final comment in comments) _commentDto(comment)];
+  }
+
+  /// Adds a comment by [viewerId] to [postId] and returns it. The post's
+  /// `commentCount` goes up with it, because it is counted, not stored.
+  Future<CommentDto> addComment(
+    String viewerId,
+    String postId,
+    String text,
+  ) async {
+    await _ready();
+    final post = _post(postId);
+    final body = text.trim();
+    if (body.isEmpty ||
+        Validators.lengthOf(body) > Validators.commentMaxLength) {
+      throw FormatException('Invalid comment', text);
+    }
+    final comment = _ServerComment(
+      id: _ids.next('c'),
+      postId: post.id,
+      authorId: viewerId,
+      text: body,
+      createdAt: _clock.now().toUtc(),
+    );
+    _comments.add(comment);
+    return _commentDto(comment);
+  }
+
+  /// Deletes one of [viewerId]'s own comments.
+  ///
+  /// Someone else's comment answers [NotFoundException], exactly like a
+  /// missing one. Many APIs (GitHub, for one) answer 404 rather than 403
+  /// here, so a stranger can't even confirm that the comment exists.
+  Future<void> deleteComment(String viewerId, String commentId) async {
+    await _ready();
+    final index = _comments.indexWhere(
+      (comment) => comment.id == commentId && comment.authorId == viewerId,
+    );
+    if (index == -1) throw const NotFoundException();
+    _comments.removeAt(index);
+  }
+
   // ---------------------------------------------------------------------------
   // Seeding
 
@@ -261,6 +353,14 @@ class FakeServer {
     commentCount: _comments.where((c) => c.postId == post.id).length,
     isLiked: post.likedBy.contains(viewerId),
     bookmarkedAt: post.bookmarks[viewerId],
+  );
+
+  CommentDto _commentDto(_ServerComment comment) => CommentDto(
+    id: comment.id,
+    postId: comment.postId,
+    author: _users[comment.authorId]!,
+    text: comment.text,
+    createdAt: comment.createdAt,
   );
 
   /// The signed-in user's own record is the only one that includes an email.
@@ -363,6 +463,12 @@ final class _ServerComment {
   final String authorId;
   final String text;
   final DateTime createdAt;
+
+  /// Oldest first, ties broken by id: the order a conversation is read in.
+  static int oldestFirst(_ServerComment a, _ServerComment b) {
+    final byTime = a.createdAt.compareTo(b.createdAt);
+    return byTime != 0 ? byTime : a.id.compareTo(b.id);
+  }
 }
 
 /// A position in the feed: "just after this post". Encoded as

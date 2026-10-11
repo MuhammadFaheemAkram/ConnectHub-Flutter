@@ -7,19 +7,20 @@ import 'package:connect_hub/domain/model/post.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../helpers/backend.dart';
-import '../../helpers/feed_backend.dart';
+import '../../helpers/data_stack.dart';
+import '../../helpers/database_rows.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  late FeedBackend backend;
+  late DataStack backend;
 
   /// The client's clock runs a minute ahead of the server's, so a local
   /// guess and the server's answer are told apart.
   final clientNow = testNow.add(const Duration(minutes: 1));
 
   setUp(() async {
-    backend = FeedBackend(clientClock: Clock.fixed(clientNow));
+    backend = DataStack(clientClock: Clock.fixed(clientNow));
     await backend.feed.refresh();
   });
 
@@ -30,6 +31,62 @@ void main() {
 
   Matcher isErr(Matcher exception) =>
       isA<Err<void>>().having((err) => err.exception, 'exception', exception);
+
+  group('one post', () {
+    test('refreshPost caches a post without adding it to the feed', () async {
+      final feedBefore = await backend.feedIds();
+
+      expect(await backend.posts.refreshPost('p15'), isA<Ok<void>>());
+
+      final p15 = await backend.posts.watchPost('p15').first;
+      expect(p15?.author.name, 'Linus T.');
+      expect(await backend.feedIds(), feedBefore);
+    });
+
+    test('a post the server no longer has is removed from the cache, with '
+        'its comments', () async {
+      await backend.database.postsDao.upsertPosts([cachedPost('p_gone')]);
+      await backend.database.commentsDao.addComment(
+        cachedComment('c_gone', postId: 'p_gone'),
+      );
+
+      final result = await backend.posts.refreshPost('p_gone');
+
+      expect(result, isErr(isA<NotFoundException>()));
+      expect(await backend.posts.watchPost('p_gone').first, isNull);
+      expect(
+        await backend.database.select(backend.database.comments).get(),
+        isEmpty,
+      );
+    });
+  });
+
+  group('create post', () {
+    test(
+      'the new post heads the feed, written by the signed-in user',
+      () async {
+        final result = await backend.posts.createPost(
+          content: 'Hello, ConnectHub!',
+        );
+
+        expect(result, isA<Ok<void>>());
+        final top = (await backend.feed.watchFeed().first).first;
+        expect(top.content, 'Hello, ConnectHub!');
+        expect(top.author.id, 'u_demo');
+        expect(top.commentCount, 0);
+      },
+    );
+
+    test('a failure leaves the feed as it was', () async {
+      final feedBefore = await backend.feedIds();
+      backend.network.failRequests = true;
+
+      final result = await backend.posts.createPost(content: 'Hello');
+
+      expect(result, isErr(isA<NetworkException>()));
+      expect(await backend.feedIds(), feedBefore);
+    });
+  });
 
   group('likes', () {
     test('the heart and count change at once, then take the server\'s '

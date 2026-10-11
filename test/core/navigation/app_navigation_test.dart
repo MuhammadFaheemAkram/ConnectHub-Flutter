@@ -23,6 +23,7 @@ void main() {
 
   // p1, the newest post in the seed, by Ada Lovelace.
   final firstPost = find.textContaining('analytical engine scheduler');
+  final onPost = appBarTitled('Post');
 
   int selectedTab(WidgetTester tester) =>
       tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
@@ -125,7 +126,8 @@ void main() {
       expect(onLogin, findsOneWidget);
 
       await signInWithDemoAccount(tester);
-      expect(find.text('Post "p3"'), findsOneWidget);
+      expect(onPost, findsOneWidget);
+      expect(find.textContaining('teaching my test suite'), findsOneWidget);
 
       // Opened directly, the post has nothing underneath to go back to.
       await tester.tapAndSettle(find.byTooltip('Go to the feed'));
@@ -136,7 +138,7 @@ void main() {
         'signing in again returns to where the user was', (tester) async {
       await pumpConnectHub(tester, signedIn: true);
       await tester.tapAndSettle(firstPost);
-      expect(find.text('Post "p1"'), findsOneWidget);
+      expect(onPost, findsOneWidget);
 
       // What ApiGuard does when the server answers 401.
       await getIt<SessionRepository>().expire();
@@ -147,7 +149,8 @@ void main() {
         findsOneWidget,
       );
       await signInWithDemoAccount(tester);
-      expect(find.text('Post "p1"'), findsOneWidget);
+      expect(onPost, findsOneWidget);
+      expect(firstPost, findsOneWidget);
     });
 
     testWidgets('Sign Up opens over Login, and Back returns to it', (
@@ -193,7 +196,7 @@ void main() {
       await pumpConnectHub(tester, signedIn: true);
 
       await tester.tapAndSettle(firstPost);
-      expect(find.text('Post "p1"'), findsOneWidget);
+      expect(onPost, findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
 
       await tester.tapAndSettle(find.byType(BackButton));
@@ -205,11 +208,11 @@ void main() {
       await pumpConnectHub(tester, signedIn: true);
       await tester.tapAndSettle(firstPost);
 
-      await tester.tapAndSettle(find.text('View comments'));
+      await tester.scrollToAndTap(find.text('View all 3 comments'));
       expect(appBarTitled('Comments'), findsOneWidget);
 
       await tester.tapAndSettle(find.byType(BackButton));
-      expect(find.text('Post "p1"'), findsOneWidget);
+      expect(onPost, findsOneWidget);
     });
 
     testWidgets('Chats opens from the Feed app bar, and a chat from Chats', (
