@@ -40,43 +40,49 @@ class _ShellScaffold extends StatelessWidget {
     );
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: _onDestinationSelected,
-        // Order must match the branches declared in `app_routes.dart`.
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Feed',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.bookmark_border),
-            selectedIcon: Icon(Icons.bookmark),
-            label: 'Bookmarks',
-          ),
-          NavigationDestination(
-            icon: UnreadBadge(
-              count: unreadActivity,
-              child: const Icon(Icons.notifications_none),
+      // The tab labels keep their size whatever the text setting, as on iOS's
+      // own tab bar: five labels share the width, and at large sizes
+      // "Bookmarks" broke mid-word. A long press shows the label in a
+      // tooltip, and screen readers read it.
+      bottomNavigationBar: MediaQuery.withNoTextScaling(
+        child: NavigationBar(
+          selectedIndex: navigationShell.currentIndex,
+          onDestinationSelected: _onDestinationSelected,
+          // Order must match the branches declared in `app_routes.dart`.
+          destinations: [
+            const NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Feed',
             ),
-            selectedIcon: UnreadBadge(
-              count: unreadActivity,
-              child: const Icon(Icons.notifications),
+            const NavigationDestination(
+              icon: Icon(Icons.search_outlined),
+              selectedIcon: Icon(Icons.search),
+              label: 'Search',
             ),
-            label: 'Activity',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+            const NavigationDestination(
+              icon: Icon(Icons.bookmark_border),
+              selectedIcon: Icon(Icons.bookmark),
+              label: 'Bookmarks',
+            ),
+            NavigationDestination(
+              icon: UnreadBadge(
+                count: unreadActivity,
+                child: const Icon(Icons.notifications_none),
+              ),
+              selectedIcon: UnreadBadge(
+                count: unreadActivity,
+                child: const Icon(Icons.notifications),
+              ),
+              label: 'Activity',
+            ),
+            const NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Profile',
+            ),
+          ],
+        ),
       ),
     );
   }

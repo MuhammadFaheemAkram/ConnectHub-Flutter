@@ -180,4 +180,17 @@ void main() {
 
     expect(find.text('Cache cleared.'), findsOneWidget);
   });
+
+  testWidgets('at 200 % text, the appearance choices are a list, and '
+      'choosing Dark calls the Cubit', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpView(tester);
+
+    expect(find.byType(SegmentedButton<AppThemeMode>), findsNothing);
+    expect(find.byType(RadioListTile<AppThemeMode>), findsNWidgets(3));
+
+    await tester.tap(find.widgetWithText(RadioListTile<AppThemeMode>, 'Dark'));
+    verify(() => settings.selectThemeMode(AppThemeMode.dark)).called(1);
+  });
 }

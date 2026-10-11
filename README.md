@@ -24,11 +24,13 @@ Everything is backed by a **fake, in-memory backend**, so the app runs with **no
 
 ## 📋 Project Status
 
-ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
+ConnectHub was built in **strict, reviewable phases**. Each phase ended with:
 - a building app (Android + iOS);
 - a clean analyzer and passing tests;
 - a summary doc;
 - exactly one commit.
+
+**All seven phases are complete.**
 
 | Phase | Scope | Status |
 |------:|-------|:------:|
@@ -38,7 +40,7 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 | 4 | Post detail, comments and create post; drift v2 with a tested migration | ✅ Done |
 | 5 | Search (debounced, live results), offline bookmarks with Undo, profiles and editing; drift v3 | ✅ Done |
 | 6 | Chat (ordered sends, retry, typing, realtime replies), Activity with badges, Settings; drift v4 | ✅ Done |
-| 7 | Open-source polish and final docs | ⏳ Next |
+| 7 | Open-source polish: final docs, screenshots, community files, a dark-mode and large-text accessibility pass | ✅ Done |
 
 ---
 
@@ -53,6 +55,17 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 - 📨 **Chat**: messages show at once and go out in order; a failed one says "Not sent · Tap to retry"; the other person types, then replies, over a realtime channel
 - 👤 **Profiles**: your own and other people's; edit your own
 - ⚙️ **Settings**: appearance (System / Light / Dark, applied from the first frame), unread badges, language, clear cache, developer switches (offline, expire session), log out, About
+- ♿ **Accessible**: every screen works in dark mode and at large text sizes, with labelled controls and 48 × 48 tap targets, checked by a test tour of every screen
+
+---
+
+## 📸 Screenshots
+
+| Feed | Post | Chat (dark) | Activity (dark) |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/feed-light.png" width="190" alt="Feed: posts with likes, comments and bookmarks, and unread badges on Chats and Activity"> | <img src="docs/screenshots/post-detail-light.png" width="190" alt="A post with its comments and a comment field"> | <img src="docs/screenshots/chat-typing-dark.png" width="190" alt="A chat in dark mode, with the other person typing"> | <img src="docs/screenshots/activity-dark.png" width="190" alt="Activity in dark mode: filters and unread notifications"> |
+
+More (Login, Search, profiles, Chats, Settings, and large text) in [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
 ---
 
@@ -77,7 +90,7 @@ ConnectHub is built in **strict, reviewable phases**. Each phase ends with:
 | Stream operators | `stream_transform` (`switchMap` for the search debounce, `combineLatest` for live results) | 5 |
 | Preferences | `shared_preferences` (`SharedPreferencesWithCache`, loaded before `runApp`) | 6 |
 | App info | `package_info_plus` (the version and build in About) | 6 |
-| Testing | `flutter_test`, `bloc_test`, `mocktail`, `fake_async` | 1+ |
+| Testing | `flutter_test`, `bloc_test`, `mocktail`, `fake_async`; `flutter_cache_manager` for an offline image cache in tests | 1+ |
 | Lints / CI | `flutter_lints` + strict analyzer modes; GitHub Actions | 1 |
 
 ---
@@ -126,20 +139,20 @@ AuthRepository ─▶ SessionRepository.save ─▶ SessionStorage (Keychain / K
      AuthBloc ─▶ authenticated ─▶ router re-runs the gate ─▶ the Feed (or the return address)
 ```
 
-**The feed, offline-first** (Phase 3):
+**Data flow, offline-first** (every screen since Phase 3):
 
 ```
-View ─intent─▶ FeedCubit ─▶ UseCase ─▶ FeedRepository ─┬─ read ──▶ drift (cache) ─ watch() ─▶ FeedCubit ─ state ─▶ View
-                                                       └─ refresh / load more ─▶ FeedApiService ─▶ FakeServer (in memory)
-                                                                                    ▲ token from secure storage
+View ─intent─▶ Cubit / Bloc ─▶ UseCase ─▶ Repository ─┬─ read ──▶ drift (cache) ─ watch() ─▶ Cubit ─ state ─▶ View
+                                                      └─ write / refresh ─▶ ApiService ─▶ FakeServer (in memory, seeded from assets/json)
+                                                                              ▲ token from secure storage
 ```
 
 **Search, kept live** (Phase 5):
 
 ```
-SearchBar ─ keystrokes ─▶ SearchBloc ── debounce 300 ms (switchMap) + restartable ──▶ SearchRepository.search
-                                                                                         │ caches people + posts in drift
-                                                                                         ▼ answers with their ids
+AppSearchField ─ keystrokes ─▶ SearchBloc ── debounce 300 ms (switchMap) + restartable ──▶ SearchRepository.search
+                                                                                              │ caches people + posts in drift
+                                                                                              ▼ answers with their ids
 View ◀─ state ◀─ emit.forEach(watchResults(ids)) ◀─ drift (users, posts) ◀── a like or an edit on any screen
                  (the next query's restart ends this subscription)
 ```
@@ -169,6 +182,8 @@ Key rules:
 - **Widgets render state; logic lives elsewhere.** Each screen is a Page plus a View (from Phase 2 on).
 - **Layer boundaries:** `domain/` is pure Dart, and Views never import `data/`.
 
+The layers, every screen's state holder, the error handling and the key decisions are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ---
 
 ## 🗂️ Folder Structure
@@ -176,14 +191,16 @@ Key rules:
 ```
 ConnectHub/
 ├── .fvmrc                          # pinned Flutter version (3.47.6)
-├── .github/workflows/flutter-ci.yml
+├── .github/                        # workflows/flutter-ci.yml, issue and PR templates
 ├── analysis_options.yaml           # lints + strict analyzer modes
-├── build.yaml                      # lint-free generated files
+├── build.yaml                      # lint-free generated files, drift options
+├── CHANGELOG.md · CONTRIBUTING.md · CODE_OF_CONDUCT.md · SECURITY.md · LICENSE
+├── assets/json/                    # the fake server's seed
 ├── lib/
 │   ├── main.dart                   # binding → configureDependencies() → runApp
 │   ├── app/                        # connect_hub_app (AuthBloc + SettingsCubit above the router), theme_mode_mapper
 │   ├── core/
-│   │   ├── design_system/          # theme/ (AppTheme, AppColors, tokens) + widgets/
+│   │   ├── design_system/          # theme/ (AppTheme, AppColors, tokens), widgets/, large_text (the stacking rule)
 │   │   ├── common/                 # Result, AppException, UiMessage, validators, relative_time, compact_count, IdGenerator, …
 │   │   ├── navigation/             # app_routes (+ .g.dart), app_router, auth_redirect, stream_listenable, back_to_feed_button
 │   │   ├── network/                # api/ (contracts, fakes, FakeApiClient), dto/, fake_server/, asset_json_loader
@@ -196,7 +213,8 @@ ConnectHub/
 │   │                               # post_detail, comments, create_post, edit_profile, chats, chat_detail, settings
 │   └── di/                         # injection.dart (+ .config.dart), app_module.dart
 ├── drift_schemas/                  # every exported schema version (drift_dev make-migrations)
-└── test/                           # mirrors lib/, plus helpers/
+├── docs/                           # architecture, testing, API simulation, notes, roadmap, screenshots, phase summaries
+└── test/                           # mirrors lib/, plus app/ (the accessibility tour), helpers/ and flutter_test_config.dart
 ```
 
 ---
@@ -247,6 +265,8 @@ There is no server. `FakeServer` is an in-memory stand-in that owns the data and
 - **Tokens:** they look like `fake.<userId>.<random>`. Any token for an existing user is valid, so the demo session survives restarts, unless Settings → Developer → "Expire session" revoked it: the next request then answers 401.
 - **In memory:** the server starts from the seed at every launch. Chats you had, likes you made and accounts you created are gone after a restart; the client's cache mirrors that on its next refresh, but keeps the messages it hasn't managed to send.
 
+Every service, latency, seed file, rule and error is listed in [docs/API_SIMULATION.md](docs/API_SIMULATION.md).
+
 ## 🔐 How the Session Is Stored
 
 - **Secure storage:** the session (token, user id and email) is stored with `flutter_secure_storage`, which uses the iOS Keychain or the Android Keystore. A token is a credential: it doesn't belong in `shared_preferences`, which are plain files.
@@ -287,6 +307,37 @@ The fake server owns the data; drift (SQLite) holds the client's copy of it.
 - **"Clear cache" (Settings)** deletes the cached copy of the server's data and keeps what can't be fetched again: bookmarked posts and their authors, the signed-in user, unsent messages, recent searches. The screens still open hear a signal and load again, so none of them shows its emptied list as "nothing here".
 - **The cache belongs to one user.** Logout and session expiry wipe it (recent searches included) before the token is deleted, and an answer that arrives after the session ended is dropped instead of being cached for the next user. The chat's realtime channel closes with the session.
 
+## 💬 How Chat Works
+
+- **A message shows at once.** `ChatRepository.sendMessage` writes it to drift as "sending", with an id made on the client, and the composer clears.
+- **Messages go out in order.** A `Lock` sends one at a time, like an actor's mailbox. Dart has no data races, but every `await` lets another send start, and a slow first request would otherwise land second.
+- **A failed send can be retried safely.** The bubble says "Not sent · Tap to retry", and the retry sends the same id. If the server had stored the message and only the answer was lost, it recognizes the id and returns what it has: no duplicate.
+- **Replies arrive over a realtime channel.** The repository holds one subscription to `events()` per session and handles events in order:
+  - typing started and stopped feed a typing map;
+  - a reply is written to drift with the conversation as it now stands.
+
+  Typing stays on from the first pending reply to the last.
+- **An open chat stays read.** The repository counts who is watching each conversation. While the chat is on screen, a reply is stored as read and the server is told, so the next refresh can't bring the unread count back.
+- **Unsent messages are never lost.** Refreshes, Clear cache and restarts keep them. Delivered messages come in time order, and the unsent ones after them in the order they were written, so nothing jumps when the server accepts one.
+- **The list is reversed**, the usual shape for a chat: it starts at the newest message, and scrolls back to it once when a new one arrives.
+
+## ♿ Accessibility
+
+- **Dark mode on every screen:** every colour comes from the theme, and a test checks the WCAG contrast of each custom pairing in both themes.
+- **Large text:**
+  - text grows with the system setting everywhere;
+  - above 130 %, side-by-side controls (the Appearance buttons, Edit profile and Log out) stack (`context.prefersStackedLayout`);
+  - the profile counts wrap onto rows instead of breaking words.
+- **Two deliberate limits:**
+  - the tab labels keep their size, as on iOS's own tab bar (a long press shows the label);
+  - unread badges stop growing at 130 %, so they don't cover their icon.
+- **Screen readers:**
+  - every tappable has a label;
+  - a chat row reads as one button ("Grace Hopper, 1 hour ago, …, 2 unread");
+  - a badge says "3 unread", not "3";
+  - each profile count is its own node.
+- **Tested:** an accessibility tour visits every screen and key state, in light and dark at 200 % text. It fails on any overflow, a tap target under 48 × 48, an unlabelled tappable, or text below the contrast guideline.
+
 ## ✅ Testing
 
 ```bash
@@ -295,51 +346,27 @@ fvm dart format --output=none --set-exit-if-changed .
 fvm flutter test
 ```
 
-**694 tests** after Phase 6:
-- **Chat, activity and settings** (Phase 6):
-  - the fake server's chat and notification endpoints (client ids, idempotent retries, replies in turn, a channel per user) and the `ReplyScheduler` in fake time (typing stays on across overlapping replies);
-  - drift: the chat and notifications DAOs (unsent messages kept and ordered after delivered ones, mirroring, unread sums), "Clear cache" keeping the right rows, and the v3 → v4 migration;
-  - `ChatRepository` on the real fake server: 20 concurrent sends reaching the server in order, the same with the first send held back (fails without the `Lock`), a failed send retried with the same id, an answer lost then retried without a duplicate, typing on/off across overlapping replies, replies dropped after logout, the unread rules;
-  - `NotificationRepository` (read state mirrored, optimistic mark read and mark all, with rollback), `SettingsRepository` (defaults, persistence, synchronous first read), `CacheRepository`;
-  - `ActivityCubit`, `ChatsCubit`, `ChatDetailCubit`, `BadgesCubit`, `SettingsCubit`, `SettingsToolsCubit`, and Feed, Profile and Search loading again after "Clear cache";
-  - views: Activity, Chats, Chat Detail (bubbles, typing, retry, the auto-scroll), Settings, the chat and notification widgets, contrast of the new colors;
-  - app-level: send and receive a reply, unread badges, reading a chat, a notification opening its post or profile, Dark app-wide and on the first frame, badges off, clear cache, expire session, offline chats.
-- **Search, bookmarks and profiles** (Phase 5):
-  - the fake server's search, profile, profile-update and bookmarks endpoints, and the bio rule;
-  - drift: the search, bookmarks and users DAOs (recent-search dedupe and the limit of ten, mirroring, the rename JOIN) and the v2 → v3 migration;
-  - the repositories on the real fake server: live search results, mirrored bookmarks and profile posts, a profile edit reaching every post and comment;
-  - `SearchBloc`: the real 300 ms debounce in fake time, restartable searches, scopes, live results, the recent-search rules;
-  - `BookmarksCubit` (offline, Undo, Undo racing the removal), `ProfileCubit` (not found, no "no posts" flash), `EditProfileCubit`, and their views;
-  - app-level: search to a profile, a like in the results reaching the Feed, bookmark and Undo, offline bookmarks, editing my name, my own profile as a tab, logout wiping recent searches.
-- **Posts and comments** (Phase 4):
-  - the fake server's post and comment endpoints, and the validators for post text and image URLs;
-  - drift: the comments DAO (mirroring, counts that never go below zero, writes that skip a post no longer cached) and the generated **migration tests** (every upgrade path, and v1 → v2 data integrity);
-  - `CommentRepository` / `PostRepository`: a deep-linked post fetched before its comments, optimistic delete with rollback, someone else's comment refused, a created post heading the feed;
-  - `PostDetailCubit`, `CommentsCubit`, `CreatePostCubit` (`bloc_test`), their views, and the comment tile, input and counter;
-  - app-level: open a post, comment, delete, create a post, discard a draft, a post that no longer exists.
-- **Feed** (Phase 3):
-  - the fake server's feed slice: rebased dates, derived comment counts, pages 6 / 6 / 5 with no overlap, idempotent likes, per-user bookmarks;
-  - drift: the feed JOIN and its order, window replace and append, foreign keys, and the REPLACE-cascade regression;
-  - `FeedRepository` / `PostRepository` on the real fake server: paging, refresh and load-more taking turns, optimistic writes with rollback;
-  - `FeedCubit` (`bloc_test`): loading / empty / error / loaded with no "empty" flash, refresh failures, load-more states, failure messages;
-  - the Feed view (`MockCubit`), `PostCard`, `UserAvatar` and relative time;
-  - app-level: likes, a failed refresh offline, a real 401 ending the session, logout wiping the cache.
-- **Auth** (Phase 2):
+**737 tests**, in about 35 seconds:
+- **Unit tests:**
   - the validators;
-  - the fake server (accounts, tokens, restarts) and the fake API;
-  - secure session storage;
-  - `SessionRepository` (current state, then changes; a sign-in during the restore wins);
-  - `AuthRepository` and `ApiGuard`.
-- **Blocs** (`bloc_test`):
-  - `AuthBloc`;
-  - `LoginBloc` / `SignUpBloc`: quiet errors until the first submit, then live, plus trimming and `droppable()` double submits.
-- **Views** (`MockBloc`): the Login and Sign Up forms.
-- **The gate:**
-  - every rule of `authRedirect`, including unsafe return addresses;
-  - app-level flows on the real stack: demo sign-in, a wrong password, sign-up, logout with confirmation, a deep link through sign-in, an expired session.
-- **Navigation:** the five tabs, the root-level screens above the shell, the full-screen dialogs, typed locations.
-- **Design system:** themes and contrast, and the shared widgets.
-- **DI:** a smoke test of the real container.
+  - the fake server and its reply scheduler (in fake time);
+  - the DAOs, and every drift upgrade path from v1 to v4.
+- **Repositories** on the real fake server with an in-memory database:
+  - paging without duplicates;
+  - optimistic writes and their rollback;
+  - mirroring, and the REPLACE-cascade regression;
+  - 20 concurrent chat sends arriving in order, and retries without duplicates;
+  - session expiry.
+- **Every Cubit and Bloc** (`bloc_test`): loading / empty / error / loaded with no false-empty flash, debounced and restartable search, `droppable()` submits, Undo, reloading after Clear cache.
+- **Every view:** widget tests with `MockCubit` / `MockBloc`, including the large-text layouts.
+- **App-level flows** on the real DI graph:
+  - sign-in, deep links through sign-in, and session expiry;
+  - the feed offline;
+  - posts and comments, search, bookmarks and profiles;
+  - chat with replies, activity, settings and Clear cache.
+- **An accessibility tour:** every screen and key state, in light and dark at 200 % text.
+
+The per-area breakdown, the techniques (fakes over mocks, bounded waits, mutation checks) and the gotchas are in [docs/TESTING.md](docs/TESTING.md).
 
 CI (`.github/workflows/flutter-ci.yml`) runs on every push to `main` and every pull request. It installs the FVM-pinned Flutter, checks that the committed generated code is up to date, then runs format, analyze and test.
 
@@ -368,23 +395,43 @@ CI (`.github/workflows/flutter-ci.yml`) runs on every push to `main` and every p
 | Profile edits | Room only, never on posts | UserDefaults only, never on posts | the server, then one `users` row every post JOINs |
 | Chat concurrency | coroutines | `actor MessageStore` | a `Lock` + client ids + a realtime `Stream` |
 | Settings | DataStore (read asynchronously) | UserDefaults | `SharedPreferencesWithCache`, read before the first frame |
+| Accessibility checks | none in the tests | none in the tests | a test tour of every screen, light and dark, at 200 % text |
+| CI | added in Phase 7; it watches `main`, but the repo's branch is `master` | added in Phase 7, fixed in a later commit | Phase 1, so every push is checked |
 
 ---
 
 ## 📚 Documentation
 
-- [Phase 1 — Foundation](docs/PHASE_1_SUMMARY.md)
-- [Phase 2 — Fake Auth + Session](docs/PHASE_2_SUMMARY.md)
-- [Phase 3 — Feed + Offline Cache](docs/PHASE_3_SUMMARY.md)
-- [Phase 4 — Post Detail, Comments + Create Post](docs/PHASE_4_SUMMARY.md)
-- [Phase 5 — Search, Bookmarks + Profile](docs/PHASE_5_SUMMARY.md)
-- [Phase 6 — Chat, Notifications + Settings](docs/PHASE_6_SUMMARY.md)
+- [Architecture](docs/ARCHITECTURE.md): layers, who owns what, every screen's state holder, errors, the realtime channel, key decisions
+- [Testing](docs/TESTING.md): what is covered, how the tests are built, and the gotchas
+- [API simulation](docs/API_SIMULATION.md): the fake server's services, latencies, seed data, rules, reply algorithm and developer switches
+- [Learning notes](docs/LEARNING_NOTES.md): every Flutter / Dart concept in the app
+- [Interview notes](docs/INTERVIEW_NOTES.md): questions and answers based on this codebase
+- [Screenshots](docs/SCREENSHOTS.md)
+- [Roadmap](docs/ROADMAP.md)
+- Phase write-ups:
+  - [Phase 1 — Foundation](docs/PHASE_1_SUMMARY.md)
+  - [Phase 2 — Fake Auth + Session](docs/PHASE_2_SUMMARY.md)
+  - [Phase 3 — Feed + Offline Cache](docs/PHASE_3_SUMMARY.md)
+  - [Phase 4 — Post Detail, Comments + Create Post](docs/PHASE_4_SUMMARY.md)
+  - [Phase 5 — Search, Bookmarks + Profile](docs/PHASE_5_SUMMARY.md)
+  - [Phase 6 — Chat, Notifications + Settings](docs/PHASE_6_SUMMARY.md)
+  - [Phase 7 — Open-Source Polish](docs/PHASE_7_SUMMARY.md)
+- [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md)
 
 ---
 
 ## 🗺️ Roadmap
 
-Every feature works after Phase 6. Phase 7 is the open-source polish: the remaining docs (architecture, testing, the fake backend's API simulation, learning and interview notes), light and dark screenshots, the community files, and a dark-mode and large-text pass on every screen.
+All seven phases are done. Natural next steps:
+- a real `dio` backend behind the same API service interfaces, with a token refresh and a WebSocket realtime channel;
+- automatic retry of unsent messages;
+- real translations behind the language setting (`gen-l10n`);
+- following people, and photo uploads;
+- integration and golden tests;
+- an adaptive tablet layout.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 

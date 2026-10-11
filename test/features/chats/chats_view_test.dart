@@ -89,7 +89,7 @@ void main() {
   ) async {
     await pumpView(tester, loaded([withGrace, withAlan]));
 
-    await tester.enterText(find.byType(SearchBar), 'gr');
+    await tester.enterText(find.byType(AppSearchField), 'gr');
     verify(() => cubit.search('gr')).called(1);
   });
 }

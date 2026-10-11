@@ -184,6 +184,20 @@ void main() {
       verify(() => cubit.loadMore()).called(1);
     });
 
+    testWidgets('a list that comes to fit on screen without a scroll (the '
+        'window grew) asks for the next page', (tester) async {
+      final posts = [for (var i = 0; i < 12; i++) samplePost('p$i')];
+      await pumpView(tester, loaded(posts));
+      await tester.pump();
+      verifyNever(() => cubit.loadMore());
+
+      tester.view.physicalSize = const Size(390 * 3, 10000 * 3);
+      await tester.pump();
+      await tester.pump();
+
+      verify(() => cubit.loadMore()).called(1);
+    });
+
     testWidgets('a failed page shows Retry, and only Retry loads it again', (
       tester,
     ) async {

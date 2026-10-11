@@ -58,11 +58,6 @@ class _SearchViewState extends State<SearchView> {
     _bloc.add(SearchSubmitted(query));
   }
 
-  void _clearQuery() {
-    _query.clear();
-    _bloc.add(const SearchQueryChanged(''));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,24 +79,12 @@ class _SearchViewState extends State<SearchView> {
                 AppSpacing.medium,
                 AppSpacing.xSmall,
               ),
-              child: ValueListenableBuilder(
-                valueListenable: _query,
-                builder: (context, value, _) => SearchBar(
-                  controller: _query,
-                  hintText: 'Search people and posts',
-                  leading: const Icon(Icons.search),
-                  trailing: [
-                    if (value.text.isNotEmpty)
-                      IconButton(
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.close),
-                        onPressed: _clearQuery,
-                      ),
-                  ],
-                  textInputAction: TextInputAction.search,
-                  onChanged: (query) => _bloc.add(SearchQueryChanged(query)),
-                  onSubmitted: (query) => _bloc.add(SearchSubmitted(query)),
-                ),
+              child: AppSearchField(
+                controller: _query,
+                hintText: 'Search people and posts',
+                onChanged: (query) => _bloc.add(SearchQueryChanged(query)),
+                onSubmitted: (query) => _bloc.add(SearchSubmitted(query)),
+                onCleared: () => _bloc.add(const SearchQueryChanged('')),
               ),
             ),
             const _ScopeChips(),

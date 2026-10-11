@@ -83,7 +83,7 @@ void main() {
     expect(events.whereType<SearchSubmitted>().single.query, 'ada');
     expect(events.last, isA<SearchRecentSearchesCleared>());
     // The tapped search is written into the field.
-    expect(find.widgetWithText(SearchBar, 'ada'), findsOneWidget);
+    expect(find.widgetWithText(AppSearchField, 'ada'), findsOneWidget);
   });
 
   testWidgets("typing sends every change; the keyboard's search button "

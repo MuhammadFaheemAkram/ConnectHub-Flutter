@@ -164,4 +164,48 @@ void main() {
 
     verify(() => cubit.load()).called(1);
   });
+
+  group('large text', () {
+    double top(WidgetTester tester, String label) =>
+        tester.getTopLeft(find.text(label)).dy;
+
+    testWidgets('Edit profile and Log out sit side by side', (tester) async {
+      await pumpView(
+        tester,
+        ProfileState.loaded(user: adaProfile, posts: [p1]),
+        isMine: true,
+      );
+
+      expect(
+        tester.getCenter(find.text('Log out')).dx,
+        greaterThan(tester.getCenter(find.text('Edit profile')).dx),
+      );
+      expect(
+        top(tester, 'Log out'),
+        lessThan(top(tester, 'Edit profile') + 20),
+      );
+    });
+
+    testWidgets('at 200 %, they stack, full width, and no word breaks', (
+      tester,
+    ) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpView(
+        tester,
+        ProfileState.loaded(user: adaProfile, posts: [p1]),
+        isMine: true,
+      );
+
+      expect(
+        top(tester, 'Log out'),
+        greaterThan(tester.getBottomLeft(find.text('Edit profile')).dy),
+      );
+      // "Followers" keeps to one line: as tall as the one-word "Posts".
+      expect(
+        tester.getSize(find.text('Followers')).height,
+        tester.getSize(find.text('Posts')).height,
+      );
+    });
+  });
 }

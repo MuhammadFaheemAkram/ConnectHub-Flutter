@@ -1,11 +1,13 @@
 /// One import for the whole design system: theme, tokens and shared widgets.
 library;
 
+export 'package:connect_hub/core/design_system/large_text.dart';
 export 'package:connect_hub/core/design_system/theme/app_colors.dart';
 export 'package:connect_hub/core/design_system/theme/app_icon_size.dart';
 export 'package:connect_hub/core/design_system/theme/app_radius.dart';
 export 'package:connect_hub/core/design_system/theme/app_spacing.dart';
 export 'package:connect_hub/core/design_system/theme/app_theme.dart';
+export 'package:connect_hub/core/design_system/widgets/app_search_field.dart';
 export 'package:connect_hub/core/design_system/widgets/app_text_field.dart';
 export 'package:connect_hub/core/design_system/widgets/button_progress.dart';
 export 'package:connect_hub/core/design_system/widgets/character_counter.dart';

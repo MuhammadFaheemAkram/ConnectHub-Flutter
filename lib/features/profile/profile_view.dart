@@ -200,7 +200,12 @@ class _ProfileHeader extends StatelessWidget {
             ),
           ],
           const SizedBox(height: AppSpacing.medium),
-          Row(
+          // A Wrap, not a Row of thirds: with large text, the counts move
+          // onto a second row instead of breaking "Followers" mid-word.
+          Wrap(
+            alignment: WrapAlignment.spaceEvenly,
+            spacing: AppSpacing.small,
+            runSpacing: AppSpacing.small,
             children: [
               _Count(label: 'Followers', count: user.followersCount),
               _Count(label: 'Following', count: user.followingCount),
@@ -228,7 +233,9 @@ class _Count extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final value = compactCount(count);
-    return Expanded(
+    return ConstrainedBox(
+      // About a third of a phone's width, so the three sit evenly in a row.
+      constraints: const BoxConstraints(minWidth: 96),
       child: Semantics(
         // Its own node, so each count is read (and focused) on its own.
         container: true,
@@ -261,21 +268,31 @@ class _MyProfileActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final edit = FilledButton.tonal(
+      onPressed: onEditProfile,
+      child: const Text('Edit profile'),
+    );
+    final logout = OutlinedButton(
+      onPressed: onLogout,
+      child: const Text('Log out'),
+    );
+    // Side by side, each button gets half the width; with large text,
+    // "Edit profile" would break there. Full-width buttons, stacked, instead.
+    if (context.prefersStackedLayout) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          edit,
+          const SizedBox(height: AppSpacing.xSmall),
+          logout,
+        ],
+      );
+    }
     return Row(
       children: [
-        Expanded(
-          child: FilledButton.tonal(
-            onPressed: onEditProfile,
-            child: const Text('Edit profile'),
-          ),
-        ),
+        Expanded(child: edit),
         const SizedBox(width: AppSpacing.small),
-        Expanded(
-          child: OutlinedButton(
-            onPressed: onLogout,
-            child: const Text('Log out'),
-          ),
-        ),
+        Expanded(child: logout),
       ],
     );
   }

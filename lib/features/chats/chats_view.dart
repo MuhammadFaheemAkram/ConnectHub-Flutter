@@ -45,25 +45,11 @@ class _ChatsViewState extends State<ChatsView> {
               AppSpacing.medium,
               AppSpacing.small,
             ),
-            child: ValueListenableBuilder(
-              valueListenable: _query,
-              builder: (context, value, _) => SearchBar(
-                controller: _query,
-                hintText: 'Search chats',
-                leading: const Icon(Icons.search),
-                trailing: [
-                  if (value.text.isNotEmpty)
-                    IconButton(
-                      tooltip: 'Clear search',
-                      icon: const Icon(Icons.close),
-                      onPressed: () {
-                        _query.clear();
-                        cubit.search('');
-                      },
-                    ),
-                ],
-                onChanged: cubit.search,
-              ),
+            child: AppSearchField(
+              controller: _query,
+              hintText: 'Search chats',
+              onChanged: cubit.search,
+              onCleared: () => cubit.search(''),
             ),
           ),
           Expanded(

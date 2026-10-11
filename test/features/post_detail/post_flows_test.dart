@@ -13,8 +13,6 @@ void main() {
   final firstPost = find.textContaining('analytical engine scheduler');
   final commentField = find.widgetWithText(TextField, 'Add a comment…');
 
-  Finder appBarTitled(String title) => find.widgetWithText(AppBar, title);
-
   Finder onFirstCard(Finder target) => find.descendant(
     of: find.ancestor(of: firstPost, matching: find.byType(Card)),
     matching: target,

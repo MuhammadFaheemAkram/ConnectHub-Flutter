@@ -13,11 +13,6 @@ import '../../helpers/test_dependencies.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Finder destination(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
-
   ThemeMode themeMode(WidgetTester tester) =>
       tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode!;
 

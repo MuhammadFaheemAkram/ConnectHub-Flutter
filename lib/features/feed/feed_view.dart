@@ -135,8 +135,9 @@ class _PostListState extends State<_PostList> {
   @override
   void initState() {
     super.initState();
+    // Scrolling near the end asks for the next page. The first layout needs
+    // no extra check: it reports its scroll metrics (see `build`).
     _scroll.addListener(_loadMoreIfNearEnd);
-    _checkAfterLayout();
   }
 
   @override
@@ -180,25 +181,35 @@ class _PostListState extends State<_PostList> {
     final posts = state.posts;
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
-      child: ListView.separated(
-        controller: _scroll,
-        physics: const AlwaysScrollableScrollPhysics(),
-        // Bottom padding keeps the last post clear of the FAB.
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.medium,
-          AppSpacing.xSmall,
-          AppSpacing.medium,
-          AppSpacing.xLarge * 3,
+      // The viewport or the content can change size without any scrolling (a
+      // rotation, a resized window, a different text size). Check again then
+      // too: a list that suddenly fits on screen would otherwise show its
+      // footer spinner forever, with nothing to scroll.
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: (_) {
+          _loadMoreIfNearEnd();
+          return false;
+        },
+        child: ListView.separated(
+          controller: _scroll,
+          physics: const AlwaysScrollableScrollPhysics(),
+          // Bottom padding keeps the last post clear of the FAB.
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.medium,
+            AppSpacing.xSmall,
+            AppSpacing.medium,
+            AppSpacing.xLarge * 3,
+          ),
+          itemCount: posts.length + 1,
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.small),
+          itemBuilder: (context, index) => index < posts.length
+              ? widget.cardFor(posts[index])
+              : _FeedFooter(
+                  hasMore: state.hasMore,
+                  status: state.loadMore,
+                  onRetry: widget.onLoadMore,
+                ),
         ),
-        itemCount: posts.length + 1,
-        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.small),
-        itemBuilder: (context, index) => index < posts.length
-            ? widget.cardFor(posts[index])
-            : _FeedFooter(
-                hasMore: state.hasMore,
-                status: state.loadMore,
-                onRetry: widget.onLoadMore,
-              ),
       ),
     );
   }

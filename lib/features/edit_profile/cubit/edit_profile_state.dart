@@ -24,8 +24,6 @@ abstract class EditProfileState with _$EditProfileState {
     String? errorMessage,
   }) = _EditProfileState;
 
-  bool get isLoading => original == null && loadError == null;
-
   /// What the bio's counter shows: characters as people count them.
   int get bioLength => Validators.lengthOf(bio);
 

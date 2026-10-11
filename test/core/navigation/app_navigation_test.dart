@@ -11,22 +11,12 @@ import '../../helpers/app_harness.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Finder destination(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
-
-  Finder appBarTitled(String title) => find.widgetWithText(AppBar, title);
-
   final onLogin = find.text('Welcome to ConnectHub');
   final onFeed = appBarTitled('ConnectHub');
 
   // p1, the newest post in the seed, by Ada Lovelace.
   final firstPost = find.textContaining('analytical engine scheduler');
   final onPost = appBarTitled('Post');
-
-  int selectedTab(WidgetTester tester) =>
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
 
   Future<void> signInWithDemoAccount(WidgetTester tester) async {
     await tester.tapAndSettle(find.text('Use demo account'));
@@ -49,7 +39,7 @@ void main() {
       await pumpConnectHub(tester, signedIn: true);
 
       expect(onFeed, findsOneWidget);
-      expect(selectedTab(tester), 0);
+      expect(tester.selectedTab, 0);
     });
 
     testWidgets('signing in with the demo account opens the Feed', (
@@ -201,7 +191,7 @@ void main() {
 
       await tester.tapAndSettle(find.byType(BackButton));
       expect(onFeed, findsOneWidget);
-      expect(selectedTab(tester), 0);
+      expect(tester.selectedTab, 0);
     });
 
     testWidgets('comments open on top of their post', (tester) async {
@@ -262,13 +252,13 @@ void main() {
       await tester.tapAndSettle(find.byTooltip('Settings'));
       expect(appBarTitled('Settings'), findsOneWidget);
       await tester.tapAndSettle(find.byType(BackButton));
-      expect(selectedTab(tester), 4);
+      expect(tester.selectedTab, 4);
 
       await tester.tapAndSettle(find.text('Edit profile'));
       expect(find.byType(CloseButton), findsOneWidget);
       await tester.tapAndSettle(find.byType(CloseButton));
       expect(appBarTitled('Profile'), findsOneWidget);
-      expect(selectedTab(tester), 4);
+      expect(tester.selectedTab, 4);
     });
 
     testWidgets("someone else's profile opens above the shell", (tester) async {

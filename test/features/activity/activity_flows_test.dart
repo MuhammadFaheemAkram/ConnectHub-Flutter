@@ -8,11 +8,6 @@ import '../../helpers/app_harness.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Finder destination(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
-
   /// The Activity tab's badge.
   Finder tabBadge(String count) => find.descendant(
     of: find.byType(NavigationBar),

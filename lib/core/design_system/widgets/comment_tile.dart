@@ -21,6 +21,13 @@ class CommentTile extends StatelessWidget {
   final VoidCallback? onAuthorTap;
   final VoidCallback? onDelete;
 
+  /// The picture is 36 px, but tapping it needs a 48 × 48 target (the
+  /// minimum for touch). The extra 6 px around it come out of the padding,
+  /// so the picture and the text stay where they were.
+  static const _avatarSize = 36.0;
+  static const _tapTarget = 48.0;
+  static const _inset = (_tapTarget - _avatarSize) / 2;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -28,28 +35,34 @@ class CommentTile extends StatelessWidget {
     final onDelete = this.onDelete;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.medium,
-        AppSpacing.xSmall,
+        AppSpacing.medium - _inset,
+        AppSpacing.xSmall - _inset,
         AppSpacing.xxSmall,
         AppSpacing.xSmall,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkWell(
-            onTap: onAuthorTap,
-            customBorder: const CircleBorder(),
-            child: UserAvatar(
-              name: author.name,
-              url: author.avatarUrl,
-              size: 36,
+          SizedBox.square(
+            dimension: _tapTarget,
+            child: InkWell(
+              onTap: onAuthorTap,
+              customBorder: const CircleBorder(),
+              child: Center(
+                child: UserAvatar(
+                  name: author.name,
+                  url: author.avatarUrl,
+                  size: _avatarSize,
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: AppSpacing.small),
+          const SizedBox(width: AppSpacing.small - _inset),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: _inset),
                 Row(
                   children: [
                     Flexible(

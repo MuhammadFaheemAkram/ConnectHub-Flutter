@@ -62,7 +62,7 @@ void main() {
     await pumpConnectHub(tester, signedIn: true);
     await tester.tapAndSettle(chatsButton);
 
-    await tester.enterText(find.byType(SearchBar), 'machines');
+    await tester.enterText(find.byType(AppSearchField), 'machines');
     await tester.pump();
 
     expect(find.text('Alan Turing'), findsOneWidget);

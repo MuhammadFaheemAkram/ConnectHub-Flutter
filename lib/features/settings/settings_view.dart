@@ -89,31 +89,45 @@ class _ThemeModePicker extends StatelessWidget {
 
   final AppThemeMode selected;
 
+  static const _choices = [
+    (AppThemeMode.system, 'System', Icons.brightness_auto_outlined),
+    (AppThemeMode.light, 'Light', Icons.light_mode_outlined),
+    (AppThemeMode.dark, 'Dark', Icons.dark_mode_outlined),
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final cubit = context.read<SettingsCubit>();
+    // Three segments share a phone's width. With large text, "System" would
+    // break mid-word inside its segment, so the choices become a list.
+    if (context.prefersStackedLayout) {
+      return RadioGroup<AppThemeMode>(
+        groupValue: selected,
+        onChanged: (mode) {
+          if (mode != null) cubit.selectThemeMode(mode);
+        },
+        child: Column(
+          children: [
+            for (final (mode, label, icon) in _choices)
+              RadioListTile<AppThemeMode>(
+                value: mode,
+                title: Text(label),
+                secondary: Icon(icon),
+              ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.medium),
       child: SegmentedButton<AppThemeMode>(
-        segments: const [
-          ButtonSegment(
-            value: AppThemeMode.system,
-            icon: Icon(Icons.brightness_auto_outlined),
-            label: Text('System'),
-          ),
-          ButtonSegment(
-            value: AppThemeMode.light,
-            icon: Icon(Icons.light_mode_outlined),
-            label: Text('Light'),
-          ),
-          ButtonSegment(
-            value: AppThemeMode.dark,
-            icon: Icon(Icons.dark_mode_outlined),
-            label: Text('Dark'),
-          ),
+        segments: [
+          for (final (mode, label, icon) in _choices)
+            ButtonSegment(value: mode, icon: Icon(icon), label: Text(label)),
         ],
         selected: {selected},
         onSelectionChanged: (selection) =>
-            context.read<SettingsCubit>().selectThemeMode(selection.single),
+            cubit.selectThemeMode(selection.single),
       ),
     );
   }

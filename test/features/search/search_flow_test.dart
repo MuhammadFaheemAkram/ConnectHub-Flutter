@@ -9,11 +9,6 @@ import '../../helpers/app_harness.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Finder destination(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
-
   final searchField = find.byType(TextField);
   final adaRow = find.widgetWithText(ListTile, 'Ada Lovelace');
 

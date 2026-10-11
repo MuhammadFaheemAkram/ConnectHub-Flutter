@@ -10,11 +10,6 @@ import '../../helpers/app_harness.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Finder destination(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
-
   // p1, the newest post in the seed.
   final firstPost = find.textContaining('analytical engine scheduler');
 

@@ -8,16 +8,6 @@ import '../../helpers/app_harness.dart';
 void main() {
   tearDown(getIt.reset);
 
-  Finder destination(String label) => find.descendant(
-    of: find.byType(NavigationBar),
-    matching: find.text(label),
-  );
-
-  int selectedTab(WidgetTester tester) =>
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
-
-  Finder appBarTitled(String title) => find.widgetWithText(AppBar, title);
-
   testWidgets("someone else's profile shows their header and every post", (
     tester,
   ) async {
@@ -40,7 +30,7 @@ void main() {
 
     await tester.tapAndSettle(find.text('Demo User'));
 
-    expect(selectedTab(tester), 4);
+    expect(tester.selectedTab, 4);
     expect(find.text('Edit profile'), findsOneWidget);
   });
 
@@ -51,7 +41,7 @@ void main() {
       initialLocation: '/users/u_demo',
     );
 
-    expect(selectedTab(tester), 4);
+    expect(tester.selectedTab, 4);
     expect(find.text('Edit profile'), findsOneWidget);
   });
 

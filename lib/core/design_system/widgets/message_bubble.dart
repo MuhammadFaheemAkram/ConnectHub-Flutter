@@ -94,10 +94,14 @@ class MessageBubble extends StatelessWidget {
                 children: [
                   Icon(Icons.error_outline, size: 16, color: scheme.error),
                   const SizedBox(width: AppSpacing.xxSmall),
-                  Text(
-                    failedLabel,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: scheme.error,
+                  // Wraps rather than overflows at large text sizes.
+                  Flexible(
+                    child: Text(
+                      failedLabel,
+                      textAlign: TextAlign.end,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.error,
+                      ),
                     ),
                   ),
                 ],
